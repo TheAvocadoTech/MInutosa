@@ -10,7 +10,7 @@ const app = express();
 // Import routes
 
 const connectDB = require("./config/db");
-const AuthRoutes = require("./routes/Auth.routes");
+const Auth = require("./routes/Auth.routes");
 
 // Middleware
 app.use(helmet());
@@ -34,7 +34,7 @@ app.get("/", (req, res) => {
 connectDB();
 
 // Route registrations
-app.use("/api/auth", AuthRoutes);
+app.use("/api/auth", Auth);
 
 // Utility: List all routes safely
 const listRoutes = (app, baseUrl) => {
