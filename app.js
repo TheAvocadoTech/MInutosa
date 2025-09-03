@@ -1,8 +1,7 @@
 const express = require("express");
-const mongoose = require("mongoose");
 const cors = require("cors");
 const helmet = require("helmet");
-const rateLimit = require("express-rate-limit");
+
 require("dotenv").config();
 
 const app = express();
@@ -16,14 +15,7 @@ const Auth = require("./routes/Auth.routes");
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
-
-// Rate limiting for auth (OTP, login, etc.)
-// const limiter = rateLimit({
-//   windowMs: 15 * 60 * 1000,
-//   max: 5,
-//   message: "Too many OTP requests, please try again later",
-// });
-// app.use("/api/auth", limiter);
+app.use("/api/auth", Auth);
 
 // Health check
 app.get("/", (req, res) => {
@@ -32,9 +24,6 @@ app.get("/", (req, res) => {
 
 // Connect to MongoDB
 connectDB();
-
-// Route registrations
-app.use("/api/auth", Auth);
 
 // Utility: List all routes safely
 const listRoutes = (app, baseUrl) => {
