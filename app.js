@@ -3,37 +3,29 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
-const app = express();
 require("dotenv").config();
 
-const connectDB = require("./config/db");
-const authRoutes = require("./routes/auth");
-const adsRoutes = require("./routes/ads.route");
-const categoryRoutes = require("./routes/category.routes");
-const subCategoryRoutes = require("./routes/subCategory.routes");
-const itemRoutes = require("./routes/item.routes");
-const adminRoutes = require("./routes/admin.route"); // Admin routes
-//const orders = require("./src/routes/order.routes");
-const cart = require("./routes/cart.routes");
-const promotion = require("./routes/promo.routes");
-const websiteSettingsRoutes = require("./routes/bottom.route");
-const vendor = require('./routes/vender.routes')
+const app = express();
 
+// Import routes
+
+const connectDB = require("./config/db");
+const AuthRoutes = require("./routes/Auth.routes");
 
 // Middleware
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
 
-// Rate limiting for auth (like OTP, login)
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // limit each IP to 5 requests
-  message: "Too many OTP requests, please try again later",
-});
-app.use("/api/auth", limiter);
+// Rate limiting for auth (OTP, login, etc.)
+// const limiter = rateLimit({
+//   windowMs: 15 * 60 * 1000,
+//   max: 5,
+//   message: "Too many OTP requests, please try again later",
+// });
+// app.use("/api/auth", limiter);
 
-// Health check route
+// Health check
 app.get("/", (req, res) => {
   res.send("You are connected");
 });
@@ -42,20 +34,48 @@ app.get("/", (req, res) => {
 connectDB();
 
 // Route registrations
-app.use("/api/auth", authRoutes); // Authentication routes
-app.use("/api", adsRoutes); // Ad-related routes
-app.use("/api", categoryRoutes); // Category routes
-app.use("/api", subCategoryRoutes); // Subcategory routes
-app.use("/api/items", itemRoutes); // Item routes
-app.use("/api/admin", adminRoutes); // Admin routes
-app.use("/api/cart", cart); //cart
-//app.use("/api/orders", orders); // Order
-app.use("/api/promo", promotion); // Promotion
-app.use('/api/website-settings', websiteSettingsRoutes); // BottomBar
-app.use('/api/vendor',vendor) // Vendor
+app.use("/api/auth", AuthRoutes);
 
-// Start server
-const PORT = process.env.PORT || 3000;
+// Utility: List all routes safely
+const listRoutes = (app, baseUrl) => {
+  if (!app._router || !app._router.stack) {
+    console.warn("⚠️ No routes found (app._router.stack is undefined)");
+    return;
+  }
+
+  console.log("📂 Available Routes:");
+  app._router.stack.forEach((middleware) => {
+    if (middleware.route) {
+      // Direct routes
+      const method = Object.keys(middleware.route.methods)
+        .join(", ")
+        .toUpperCase();
+      console.log(`${method} ${baseUrl}${middleware.route.path}`);
+    } else if (middleware.name === "router" && middleware.handle.stack) {
+      // Nested router middleware
+      middleware.handle.stack.forEach((handler) => {
+        if (handler.route) {
+          const method = Object.keys(handler.route.methods)
+            .join(", ")
+            .toUpperCase();
+          console.log(`${method} ${baseUrl}${handler.route.path}`);
+        }
+      });
+    }
+  });
+};
+
+// Start server with Azure-safe PORT handling
+const PORT = process.env.PORT;
+if (!PORT) {
+  console.error("❌ PORT not set. Azure App Service needs process.env.PORT.");
+  process.exit(1);
+}
+const BASE_URL = `http://localhost:${PORT}`;
+
+// ✅ Call listRoutes *before* starting server
+listRoutes(app, BASE_URL);
+
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Server running at ${BASE_URL}`);
 });
