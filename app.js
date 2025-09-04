@@ -11,7 +11,7 @@ const app = express();
 const connectDB = require("./config/db");
 const Auth = require("./routes/Auth.routes");
 const Banner = require("./routes/Banner.routes");
-
+const Category = require("./routes/category.routes");
 // Middleware
 app.use(helmet());
 app.use(cors());
@@ -21,6 +21,8 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use("/api/auth", Auth);
 //banner routes
 app.use("/api/ads", Banner);
+//Category
+app.use("/api/category", Category);
 
 // Health check
 app.get("/", (req, res) => {
