@@ -9,7 +9,7 @@ const app = express();
 // Import routes
 
 const connectDB = require("./config/db");
-// const Auth = require("./routes/Auth.routes");
+const AuthRoutes = require("./routes/Auth.routes");
 const Banner = require("./routes/Banner.routes");
 const Category = require("./routes/category.routes");
 // Middleware
@@ -23,6 +23,7 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use("/api/ads", Banner);
 //Category
 app.use("/api/category", Category);
+app.use("/api/auth", AuthRoutes);
 
 // Health check
 app.get("/", (req, res) => {
