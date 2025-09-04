@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const vendorSchema = new mongoose.Schema(
   {
@@ -44,4 +44,4 @@ const vendorSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model('Vendor', vendorSchema);
+module.exports = mongoose.model("Vendor", vendorSchema);
