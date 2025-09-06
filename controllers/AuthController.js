@@ -111,8 +111,25 @@ const resendOtp = async (req, res) => {
   }
 };
 
+const getAllUsers = async (req, res) => {
+  try {
+    const users = await User.find().select("-otp -__v");
+    // excluding OTP and __v field for security/clean response
+
+    res.status(200).json({
+      success: true,
+      count: users.length,
+      users,
+    });
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
   sendOtp,
   verifyOtp,
   resendOtp,
+  getAllUsers,
 };
