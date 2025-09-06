@@ -9,7 +9,7 @@ const app = express();
 // Import routes
 
 const connectDB = require("./config/db");
-const AuthRoutes = require("./routes/Auth.routes");
+// const AuthRoutes = require("./routes/Auth.routes");
 const Banner = require("./routes/Banner.routes");
 const Category = require("./routes/category.routes");
 // Middleware
