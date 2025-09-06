@@ -18,7 +18,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 //authentication routes
-app.use("/api/auth", AuthRoutes);
+// app.use("/api/auth", AuthRoutes);
 //banner routes
 app.use("/api/ads", Banner);
 //Category
