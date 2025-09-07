@@ -9,7 +9,7 @@ const app = express();
 // Import routes
 
 const connectDB = require("./config/db");
-const AuthRoutes = require("./routes/Auth.routes");
+const UserRoutes = require("./routes/Users.routes");
 const Banner = require("./routes/Banner.routes");
 const Category = require("./routes/category.routes");
 // Middleware
@@ -18,7 +18,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 //authentication routes
-app.use("/api/auth", AuthRoutes);
+app.use("/api/auth", UserRoutes);
 //banner routes
 app.use("/api/ads", Banner);
 //Category
