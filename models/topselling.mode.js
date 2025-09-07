@@ -1,33 +1,27 @@
-// models/TopSellingProduct.js
+import mongoose from "mongoose";
 
-const mongoose = require('mongoose');
-
-// Define the schema for Top Selling Product
-const topSellingProductSchema = new mongoose.Schema({
-    productId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Product', // Assuming you have a Product model
-        required: true
+const subCategorySchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      default: "",
     },
-    soldQuantity: {
-        type: Number,
-        default: 0
+    image: {
+      type: String,
+      default: "",
     },
+    category: [
+      {
+        type: mongoose.Schema.ObjectId,
+        ref: "category",
+      },
+    ],
+  },
+  {
+    timestamps: true,
+  }
+);
 
-    lastSoldDate: {
-        type: Date,
-        default: Date.now
-    },
-    startDate:{
-        type:Date,
-        required:true
-    },
-    endDate:{
-        type:Date,
-        required:true
-    }
-}, { timestamps: true });
+const SubCategoryModel = mongoose.model("subCategory", subCategorySchema);
 
-// Create the model
-module.exports = mongoose.model('TopSellingProduct', topSellingProductSchema);
-
+export default SubCategoryModel;

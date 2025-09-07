@@ -1,50 +1,47 @@
-const mongoose = require('mongoose'); // Add missing import
-const Subcategory = require("../models/subCategory.model")
+const mongoose = require("mongoose");
+const Subcategory = require("../models/subCategory.model");
 const Category = require("../models/Category.model");
 
-// Helper function for consistent ObjectId validation
-const isValidObjectId = (id) => {
-  return mongoose.Types.ObjectId.isValid(id);
-};
+// ================= Helper Functions ================= //
 
-// Helper function to find category by ID or name
+// Validate ObjectId
+const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
+
+// Find category by ID or name
 const findCategory = async (categoryInput) => {
   if (isValidObjectId(categoryInput)) {
     return await Category.findById(categoryInput);
-  } else {
-    return await Category.findOne({ name: categoryInput });
   }
+  return await Category.findOne({ name: categoryInput });
 };
 
+// ================= CRUD Controllers ================= //
+
+// CREATE Subcategory
 const createSubcategory = async (req, res) => {
   try {
     const { name, category } = req.body;
 
-    // Validate required fields
     if (!name || !category) {
       return res.status(400).json({
         message: "Name and category ID/name are required",
       });
     }
 
-    // Find category by ID or name
     const categoryExists = await findCategory(category);
-
     if (!categoryExists) {
       return res.status(400).json({
         message: "Invalid category. Category does not exist.",
       });
     }
 
-    // Use the found category's _id for creating subcategory
     const categoryId = categoryExists._id;
 
-    // Check for duplicate subcategory name within the same category
+    // Prevent duplicates
     const existingSubcategory = await Subcategory.findOne({
       name: name.trim(),
       category: categoryId,
     });
-
     if (existingSubcategory) {
       return res.status(400).json({
         message: "Subcategory with this name already exists in this category",
@@ -56,7 +53,6 @@ const createSubcategory = async (req, res) => {
       category: categoryId,
     });
 
-    // Populate the category for response
     const populatedSubcategory = await Subcategory.findById(
       subcategory._id
     ).populate("category", "name");
@@ -68,65 +64,50 @@ const createSubcategory = async (req, res) => {
   } catch (error) {
     console.error("Error creating subcategory:", error);
 
-    // Handle specific MongoDB errors
     if (error.name === "ValidationError") {
-      return res.status(400).json({
-        message: "Validation error",
-        details: error.message,
-      });
+      return res
+        .status(400)
+        .json({ message: "Validation error", details: error.message });
     }
-
     if (error.name === "CastError") {
-      return res.status(400).json({
-        message: "Invalid category ID format",
-      });
+      return res.status(400).json({ message: "Invalid category ID format" });
     }
-
     if (error.code === 11000) {
-      return res.status(400).json({
-        message: "Duplicate subcategory name in this category",
-      });
+      return res
+        .status(400)
+        .json({ message: "Duplicate subcategory name in this category" });
     }
 
-    return res.status(500).json({
-      message: "Internal server error",
-    });
+    return res.status(500).json({ message: "Internal server error" });
   }
 };
 
+// READ All Subcategories (with pagination & filter)
 const getSubcategories = async (req, res) => {
   try {
     const { category, page = 1, limit = 10 } = req.query;
 
-    // Build filter object
     const filter = {};
     if (category) {
-      // Handle both ObjectId and category name
       if (isValidObjectId(category)) {
         filter.category = category;
       } else {
-        // Find category by name first
         const categoryDoc = await Category.findOne({ name: category });
-        if (categoryDoc) {
-          filter.category = categoryDoc._id;
-        } else {
-          return res.status(400).json({
-            message: "Category not found",
-          });
+        if (!categoryDoc) {
+          return res.status(400).json({ message: "Category not found" });
         }
+        filter.category = categoryDoc._id;
       }
     }
 
-    // Convert limit to number and set reasonable bounds
     const limitNum = Math.min(Math.max(parseInt(limit), 1), 100);
     const pageNum = Math.max(parseInt(page), 1);
 
-    // Get subcategories with pagination
     const subcategories = await Subcategory.find(filter)
       .populate("category", "name")
       .limit(limitNum)
       .skip((pageNum - 1) * limitNum)
-      .sort({ name: 1 }); // Sort alphabetically
+      .sort({ name: 1 });
 
     const total = await Subcategory.countDocuments(filter);
 
@@ -141,21 +122,17 @@ const getSubcategories = async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching subcategories:", error);
-    return res.status(500).json({
-      message: "Internal server error",
-    });
+    return res.status(500).json({ message: "Internal server error" });
   }
 };
 
+// READ Subcategory by ID
 const getSubcategoryById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Validate ObjectId format
     if (!isValidObjectId(id)) {
-      return res.status(400).json({
-        message: "Invalid subcategory ID format",
-      });
+      return res.status(400).json({ message: "Invalid subcategory ID format" });
     }
 
     const subcategory = await Subcategory.findById(id).populate(
@@ -164,9 +141,7 @@ const getSubcategoryById = async (req, res) => {
     );
 
     if (!subcategory) {
-      return res.status(404).json({
-        message: "Subcategory not found",
-      });
+      return res.status(404).json({ message: "Subcategory not found" });
     }
 
     return res.status(200).json({
@@ -175,29 +150,22 @@ const getSubcategoryById = async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching subcategory:", error);
-    return res.status(500).json({
-      message: "Internal server error",
-    });
+    return res.status(500).json({ message: "Internal server error" });
   }
 };
 
+// READ Subcategories by Category
 const getSubcategoriesByCategory = async (req, res) => {
   try {
     const { categoryId } = req.params;
 
-    // Validate ObjectId format
     if (!isValidObjectId(categoryId)) {
-      return res.status(400).json({
-        message: "Invalid category ID format",
-      });
+      return res.status(400).json({ message: "Invalid category ID format" });
     }
 
-    // Validate if category exists
     const categoryExists = await Category.findById(categoryId);
     if (!categoryExists) {
-      return res.status(404).json({
-        message: "Category not found",
-      });
+      return res.status(404).json({ message: "Category not found" });
     }
 
     const subcategories = await Subcategory.find({ category: categoryId })
@@ -212,48 +180,39 @@ const getSubcategoriesByCategory = async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching subcategories by category:", error);
-    return res.status(500).json({
-      message: "Internal server error",
-    });
+    return res.status(500).json({ message: "Internal server error" });
   }
 };
 
+// UPDATE Subcategory
 const updateSubcategory = async (req, res) => {
   try {
     const { id } = req.params;
     const { name, category } = req.body;
 
-    // Validate ObjectId format
     if (!isValidObjectId(id)) {
-      return res.status(400).json({
-        message: "Invalid subcategory ID format",
-      });
+      return res.status(400).json({ message: "Invalid subcategory ID format" });
     }
-
-    // Validate required fields
     if (!name || !category) {
-      return res.status(400).json({
-        message: "Name and category ID/name are required",
-      });
+      return res
+        .status(400)
+        .json({ message: "Name and category ID/name are required" });
     }
 
-    // Find category by ID or name (consistent with create function)
     const categoryExists = await findCategory(category);
     if (!categoryExists) {
-      return res.status(400).json({
-        message: "Invalid category. Category does not exist.",
-      });
+      return res
+        .status(400)
+        .json({ message: "Invalid category. Category does not exist." });
     }
 
     const categoryId = categoryExists._id;
 
-    // Check for duplicate subcategory name within the same category (excluding current subcategory)
     const existingSubcategory = await Subcategory.findOne({
       name: name.trim(),
       category: categoryId,
-      _id: { $ne: id }, // Exclude current subcategory
+      _id: { $ne: id },
     });
-
     if (existingSubcategory) {
       return res.status(400).json({
         message: "Subcategory with this name already exists in this category",
@@ -267,9 +226,7 @@ const updateSubcategory = async (req, res) => {
     ).populate("category", "name");
 
     if (!subcategory) {
-      return res.status(404).json({
-        message: "Subcategory not found",
-      });
+      return res.status(404).json({ message: "Subcategory not found" });
     }
 
     return res.status(200).json({
@@ -280,37 +237,23 @@ const updateSubcategory = async (req, res) => {
     console.error("Error updating subcategory:", error);
 
     if (error.name === "ValidationError") {
-      return res.status(400).json({
-        message: "Validation error",
-        details: error.message,
-      });
+      return res
+        .status(400)
+        .json({ message: "Validation error", details: error.message });
     }
 
-    return res.status(500).json({
-      message: "Internal server error",
-    });
+    return res.status(500).json({ message: "Internal server error" });
   }
 };
 
+// DELETE Subcategory
 const deleteSubcategory = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Validate ObjectId format
     if (!isValidObjectId(id)) {
-      return res.status(400).json({
-        message: "Invalid subcategory ID format",
-      });
+      return res.status(400).json({ message: "Invalid subcategory ID format" });
     }
-
-    // Optional: Check if subcategory is being used by any items
-    // const Item = require('../models/item.model');
-    // const itemsUsingSubcategory = await Item.countDocuments({ subcategory: id });
-    // if (itemsUsingSubcategory > 0) {
-    //     return res.status(400).json({
-    //         message: `Cannot delete subcategory. It is being used by ${itemsUsingSubcategory} item(s)`
-    //     });
-    // }
 
     const subcategory = await Subcategory.findByIdAndDelete(id).populate(
       "category",
@@ -318,9 +261,7 @@ const deleteSubcategory = async (req, res) => {
     );
 
     if (!subcategory) {
-      return res.status(404).json({
-        message: "Subcategory not found",
-      });
+      return res.status(404).json({ message: "Subcategory not found" });
     }
 
     return res.status(200).json({
@@ -329,17 +270,16 @@ const deleteSubcategory = async (req, res) => {
     });
   } catch (error) {
     console.error("Error deleting subcategory:", error);
-    return res.status(500).json({
-      message: "Internal server error",
-    });
+    return res.status(500).json({ message: "Internal server error" });
   }
 };
 
+// ================= Export ================= //
 module.exports = {
   createSubcategory,
   getSubcategories,
   getSubcategoryById,
-  getSubcategoriesByCategory, // Fixed typo in function name
+  getSubcategoriesByCategory,
   updateSubcategory,
   deleteSubcategory,
 };

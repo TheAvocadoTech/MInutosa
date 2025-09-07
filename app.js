@@ -12,6 +12,7 @@ const connectDB = require("./config/db");
 const UserRoutes = require("./routes/Users.routes");
 const Banner = require("./routes/Banner.routes");
 const Category = require("./routes/category.routes");
+const SubCategory = require("./routes/subCategory.routes");
 // Middleware
 app.use(helmet());
 app.use(cors());
@@ -23,7 +24,7 @@ app.use("/api/auth", UserRoutes);
 app.use("/api/ads", Banner);
 //Category
 app.use("/api/category", Category);
-
+app.use("/api/subcategory", SubCategory);
 // Health check
 app.get("/", (req, res) => {
   res.send("You are connected");
