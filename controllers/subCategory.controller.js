@@ -20,11 +20,11 @@ const findCategory = async (categoryInput) => {
 // CREATE Subcategory
 const createSubcategory = async (req, res) => {
   try {
-    const { name, category } = req.body;
+    const { name, category, image } = req.body;
 
-    if (!name || !category) {
+    if (!name || !category || !image) {
       return res.status(400).json({
-        message: "Name and category ID/name are required",
+        message: "Name, category, and image are required",
       });
     }
 
@@ -37,7 +37,7 @@ const createSubcategory = async (req, res) => {
 
     const categoryId = categoryExists._id;
 
-    // Prevent duplicates
+    // Prevent duplicates (based on name + category)
     const existingSubcategory = await Subcategory.findOne({
       name: name.trim(),
       category: categoryId,
@@ -51,6 +51,7 @@ const createSubcategory = async (req, res) => {
     const subcategory = await Subcategory.create({
       name: name.trim(),
       category: categoryId,
+      image: image.trim(),
     });
 
     const populatedSubcategory = await Subcategory.findById(
@@ -188,7 +189,7 @@ const getSubcategoriesByCategory = async (req, res) => {
 const updateSubcategory = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, category } = req.body;
+    const { name, category, image } = req.body;
 
     if (!isValidObjectId(id)) {
       return res.status(400).json({ message: "Invalid subcategory ID format" });
@@ -219,11 +220,18 @@ const updateSubcategory = async (req, res) => {
       });
     }
 
-    const subcategory = await Subcategory.findByIdAndUpdate(
-      id,
-      { name: name.trim(), category: categoryId },
-      { new: true, runValidators: true }
-    ).populate("category", "name");
+    const updateData = {
+      name: name.trim(),
+      category: categoryId,
+    };
+    if (image) {
+      updateData.image = image.trim();
+    }
+
+    const subcategory = await Subcategory.findByIdAndUpdate(id, updateData, {
+      new: true,
+      runValidators: true,
+    }).populate("category", "name");
 
     if (!subcategory) {
       return res.status(404).json({ message: "Subcategory not found" });
