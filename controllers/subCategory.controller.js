@@ -86,7 +86,7 @@ const createSubcategory = async (req, res) => {
 // READ All Subcategories (with pagination & filter)
 const getSubcategories = async (req, res) => {
   try {
-    const { category, page = 1, limit = 10 } = req.query;
+    const { category } = req.query;
 
     const filter = {};
     if (category) {
@@ -101,25 +101,14 @@ const getSubcategories = async (req, res) => {
       }
     }
 
-    const limitNum = Math.min(Math.max(parseInt(limit), 1), 100);
-    const pageNum = Math.max(parseInt(page), 1);
-
     const subcategories = await Subcategory.find(filter)
       .populate("category", "name")
-      .limit(limitNum)
-      .skip((pageNum - 1) * limitNum)
       .sort({ name: 1 });
-
-    const total = await Subcategory.countDocuments(filter);
 
     return res.status(200).json({
       message: "Subcategories retrieved successfully",
       subcategories,
-      pagination: {
-        current: pageNum,
-        pages: Math.ceil(total / limitNum),
-        total,
-      },
+      count: subcategories.length,
     });
   } catch (error) {
     console.error("Error fetching subcategories:", error);
