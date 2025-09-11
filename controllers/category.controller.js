@@ -58,29 +58,19 @@ const createcategory = async (req, res) => {
 // Get All Categories
 const getAllCategories = async (req, res) => {
   try {
-    const { page = 1, limit = 10, search } = req.query;
+    const { search } = req.query;
 
     const filter = {};
     if (search) {
       filter.name = { $regex: search, $options: "i" };
     }
 
-    const categories = await Category.find(filter)
-      .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
-
-    const total = await Category.countDocuments(filter);
+    const categories = await Category.find(filter).sort({ createdAt: -1 });
 
     res.status(200).json({
       message: "Categories retrieved successfully",
       categories,
       count: categories.length,
-      pagination: {
-        current: parseInt(page),
-        pages: Math.ceil(total / limit),
-        total,
-      },
     });
   } catch (error) {
     console.error("Error in getAllCategories:", error);
