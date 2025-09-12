@@ -1,115 +1,120 @@
 const { cloudinary } = require("../config/cloudinary");
-const AdsModel = require("../models/Banner.model"); // updated model import
+const BannerModel = require("../models/Banner.model"); // updated model
 
-// Create Ad
-const createAd = async (req, res) => {
+// Create / Update Banner (single document for all banners)
+const createOrUpdateBanner = async (req, res) => {
   try {
-    const { image } = req.body;
+    const {
+      homeBanner1,
+      homeBanner2,
+      homeBanner3,
+      homeBanner4,
+      advertiseBanners,
+    } = req.body;
 
-    if (!image) {
-      return res.status(400).json({ message: "Image is required" });
+    let updateData = {};
+
+    // ✅ Upload and set Home Banner 1
+    if (homeBanner1) {
+      const result = await cloudinary.uploader.upload(homeBanner1, {
+        folder: "Banners/Home",
+      });
+      updateData.homeBanner1 = result.secure_url;
     }
 
-    const result = await cloudinary.uploader.upload(image, {
-      folder: "Ads",
-    });
+    // ✅ Upload and set Advertise Banners (multiple images)
+    if (advertiseBanners && advertiseBanners.length > 0) {
+      let uploadedAds = [];
+      for (let ad of advertiseBanners) {
+        const result = await cloudinary.uploader.upload(ad, {
+          folder: "Banners/Advertise",
+        });
+        uploadedAds.push(result.secure_url);
+      }
+      updateData.advertiseBanners = uploadedAds;
+    }
 
-    const newAd = new AdsModel({
-      image: result.secure_url,
-    });
+    // ✅ Upload Home Banner 2
+    if (homeBanner2) {
+      const result = await cloudinary.uploader.upload(homeBanner2, {
+        folder: "Banners/Home",
+      });
+      updateData.homeBanner2 = result.secure_url;
+    }
 
-    await newAd.save();
+    // ✅ Upload Home Banner 3
+    if (homeBanner3) {
+      const result = await cloudinary.uploader.upload(homeBanner3, {
+        folder: "Banners/Home",
+      });
+      updateData.homeBanner3 = result.secure_url;
+    }
+
+    // ✅ Upload Home Banner 4
+    if (homeBanner4) {
+      const result = await cloudinary.uploader.upload(homeBanner4, {
+        folder: "Banners/Home",
+      });
+      updateData.homeBanner4 = result.secure_url;
+    }
+
+    // ✅ Ensure only 1 Banner document exists (update or create)
+    let banner = await BannerModel.findOne();
+    if (banner) {
+      banner = await BannerModel.findByIdAndUpdate(banner._id, updateData, {
+        new: true,
+      });
+    } else {
+      banner = new BannerModel(updateData);
+      await banner.save();
+    }
+
     res.status(201).json({
       success: true,
-      message: "Ad created successfully",
-      ad: newAd,
+      message: "Banners saved successfully",
+      banner,
     });
   } catch (error) {
-    console.error("Error in createAd:", error);
+    console.error("Error in createOrUpdateBanner:", error);
     res
       .status(500)
       .json({ success: false, message: "Server error", error: error.message });
   }
 };
 
-// Get All Ads
-const getAllAds = async (req, res) => {
+// Get Banner (always returns single document)
+const getBanner = async (req, res) => {
   try {
-    const ads = await AdsModel.find();
+    const banner = await BannerModel.findOne();
 
-    if (!ads || ads.length === 0) {
-      return res.status(404).json({ message: "No ads found" });
+    if (!banner) {
+      return res.status(404).json({ message: "No banners found" });
     }
 
     res.status(200).json({
       success: true,
-      count: ads.length,
-      ads,
+      banner,
     });
   } catch (error) {
-    console.error("Error in getAllAds:", error);
+    console.error("Error in getBanner:", error);
     res.status(500).json({
       success: false,
-      message: "Server error while fetching ads",
+      message: "Server error while fetching banners",
       error: error.message,
     });
   }
 };
 
-// Update Ad
-const updateAd = async (req, res) => {
+// Delete all banners (optional)
+const deleteBanners = async (req, res) => {
   try {
-    const { id } = req.params;
-    const { image } = req.body;
-
-    let updatedData = {};
-
-    if (image) {
-      const result = await cloudinary.uploader.upload(image, {
-        folder: "Ads",
-      });
-      updatedData.image = result.secure_url;
-    }
-
-    const ad = await AdsModel.findByIdAndUpdate(id, updatedData, {
-      new: true,
-    });
-
-    if (!ad) {
-      return res.status(404).json({ success: false, message: "Ad not found" });
-    }
-
+    await BannerModel.deleteMany({});
     res.status(200).json({
       success: true,
-      message: "Ad updated successfully",
-      ad,
+      message: "All banners deleted successfully",
     });
   } catch (error) {
-    console.error("Error in updateAd:", error);
-    res
-      .status(500)
-      .json({ success: false, message: "Server error", error: error.message });
-  }
-};
-
-// Delete Ad
-const deleteAd = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const ad = await AdsModel.findByIdAndDelete(id);
-
-    if (!ad) {
-      return res.status(404).json({ success: false, message: "Ad not found" });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Ad deleted successfully",
-      ad,
-    });
-  } catch (error) {
-    console.error("Error in deleteAd:", error);
+    console.error("Error in deleteBanners:", error);
     res
       .status(500)
       .json({ success: false, message: "Server error", error: error.message });
@@ -117,8 +122,7 @@ const deleteAd = async (req, res) => {
 };
 
 module.exports = {
-  createAd,
-  getAllAds,
-  updateAd,
-  deleteAd,
+  createOrUpdateBanner,
+  getBanner,
+  deleteBanners,
 };

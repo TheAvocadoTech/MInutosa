@@ -1,23 +1,19 @@
 const express = require("express");
 const {
-  createAd,
-  getAllAds,
-  updateAd,
-  deleteAd,
+  createOrUpdateBanner,
+  getBanner,
+  deleteBanners,
 } = require("../controllers/Banner.controller");
 
 const router = express.Router();
 
-// Create a new ad
-router.post("/create", createAd);
+// ✅ Create or Update Banner (single doc for all banners)
+router.post("/create-or-update", createOrUpdateBanner);
 
-// Get all ads
-router.get("/get", getAllAds);
+// ✅ Get Banner (always returns single doc)
+router.get("/get", getBanner);
 
-// Update an ad by ID
-router.put("/:id", updateAd);
-
-// Delete an ad by ID
-router.delete("/:id", deleteAd);
+// ✅ Delete all banners
+router.delete("/delete", deleteBanners);
 
 module.exports = router;

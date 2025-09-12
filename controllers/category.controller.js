@@ -1,4 +1,5 @@
 const Category = require("../models/Category.model");
+const SubCategory = require("../models/subCategory.model");
 
 // Create Category
 const createcategory = async (req, res) => {
@@ -126,6 +127,54 @@ const updateCategory = async (req, res) => {
   }
 };
 
+// ✅ Get Subcategories by Category Name or ID
+const getSubCategoriesByCategory = async (req, res) => {
+  try {
+    const { identifier } = req.params; // can be name or id
+
+    if (!identifier) {
+      return res
+        .status(400)
+        .json({ message: "Category identifier is required" });
+    }
+
+    let category;
+
+    // Check if identifier is a valid MongoDB ObjectId
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(identifier);
+
+    if (isObjectId) {
+      // Find by ID
+      category = await Category.findById(identifier);
+    } else {
+      // Find by name (case insensitive)
+      category = await Category.findOne({
+        name: { $regex: new RegExp("^" + identifier + "$", "i") },
+      });
+    }
+
+    if (!category) {
+      return res.status(404).json({ message: "Category not found" });
+    }
+
+    // Find subcategories for the category
+    const subcategories = await SubCategory.find({ category: category._id });
+
+    res.status(200).json({
+      message: `Subcategories for category '${category.name}' retrieved successfully`,
+      category: category.name,
+      subcategories,
+      count: subcategories.length,
+    });
+  } catch (error) {
+    console.error("Error in getSubCategoriesByCategory:", error);
+    res.status(500).json({
+      message: "Server Error",
+      error: error.message,
+    });
+  }
+};
+
 // Delete Category
 const deleteCategory = async (req, res) => {
   try {
@@ -155,4 +204,5 @@ module.exports = {
   getAllCategories,
   updateCategory,
   deleteCategory,
+  getSubCategoriesByCategory,
 };
