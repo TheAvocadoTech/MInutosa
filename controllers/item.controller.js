@@ -1,21 +1,15 @@
-const mongoose = require("mongoose");
-const Item = require("../models/item.model");
+const Product = require("../models/Product.model");
 const Category = require("../models/Category.model");
-const Subcategory = require("../models/subCategory.model"); // Make sure this is exporting 'Subcategory'
+const SubCategory = require("../models/subCategory.model");
 
-const createItem = async (req, res) => {
+// ✅ Create Product
+const createProduct = async (req, res) => {
   try {
-    const itemData = req.body;
+    const productData = req.body;
 
     // Validate required fields
-    const requiredFields = [
-      "productNo",
-      "name",
-      "brand",
-      "category",
-      "subcategory",
-    ];
-    const missingFields = requiredFields.filter((field) => !itemData[field]);
+    const requiredFields = ["name", "category", "subCategory"];
+    const missingFields = requiredFields.filter((f) => !productData[f]);
 
     if (missingFields.length > 0) {
       return res.status(400).json({
@@ -26,285 +20,229 @@ const createItem = async (req, res) => {
       });
     }
 
-    // Validate and fetch category
-    const categoryExists = mongoose.Types.ObjectId.isValid(itemData.category)
-      ? await Category.findById(itemData.category)
-      : await Category.findOne({ name: itemData.category });
+    // ✅ Validate & fetch categories (array support)
+    const categories = await Category.find({
+      _id: { $in: productData.category },
+    });
 
-    if (!categoryExists) {
-      return res
-        .status(400)
-        .json({ message: "Invalid category. No matching category found." });
+    if (!categories.length) {
+      return res.status(400).json({ message: "Invalid category IDs" });
     }
 
-    // Validate and fetch subcategory
-    const subcategoryExists = mongoose.Types.ObjectId.isValid(
-      itemData.subcategory
-    )
-      ? await Subcategory.findById(itemData.subcategory)
-      : await Subcategory.findOne({ name: itemData.subcategory });
+    // ✅ Validate & fetch subcategories (array support)
+    const subCategories = await SubCategory.find({
+      _id: { $in: productData.subCategory },
+    });
 
-    if (!subcategoryExists) {
-      return res.status(400).json({
-        message: "Invalid subcategory. No matching subcategory found.",
-      });
+    if (!subCategories.length) {
+      return res.status(400).json({ message: "Invalid subCategory IDs" });
     }
 
-    // Replace name with ObjectId
-    itemData.category = categoryExists._id;
-    itemData.subcategory = subcategoryExists._id;
+    // ✅ Create Product
+    const product = await Product.create(productData);
 
-    // Create and populate item
-    const item = await Item.create(itemData);
-    const populatedItem = await Item.findById(item._id)
+    const populatedProduct = await Product.findById(product._id)
       .populate("category", "name")
-      .populate("subcategory", "name");
-    ç;
+      .populate("subCategory", "name");
 
     return res.status(201).json({
-      message: "Item created successfully",
-      item: populatedItem,
+      success: true,
+      message: "Product created successfully",
+      product: populatedProduct,
     });
   } catch (error) {
-    console.error("Error creating item:", error);
-
-    if (error.name === "ValidationError") {
-      return res.status(400).json({
-        message: "Validation error",
-        details: error.message,
-      });
-    }
-
-    if (error.code === 11000) {
-      return res.status(400).json({
-        message: "Duplicate entry found",
-        details: error.message,
-      });
-    }
-
+    console.error("Error creating product:", error);
     return res.status(500).json({
       message: "Internal server error",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+      error: error.message,
     });
   }
 };
 
-// Additional CRUD operations for completeness
-const getAllItems = async (req, res) => {
+// ✅ Get All Products
+const getAllProducts = async (req, res) => {
   try {
-    const { category, subcategory, brand } = req.query;
+    const { category, subCategory, name } = req.query;
 
-    // Build filter object
     const filter = {};
     if (category) filter.category = category;
-    if (subcategory) filter.subcategory = subcategory;
-    if (brand) filter.brand = new RegExp(brand, "i"); // Case-insensitive search
+    if (subCategory) filter.subCategory = subCategory;
+    if (name) filter.name = new RegExp(name, "i");
 
-    // Fetch all items with filters and sorting
-    // Remove populate if models are not properly registered
-    const items = await Item.find(filter)
+    const products = await Product.find(filter)
+      .populate("category", "name")
+      .populate("subCategory", "name")
       .sort({ createdAt: -1 });
 
     return res.status(200).json({
       success: true,
-      message: "Items retrieved successfully",
-      data: items,
-      total: items.length,
+      message: "Products retrieved successfully",
+      data: products,
+      total: products.length,
     });
   } catch (error) {
-    console.error("Error fetching items:", error);
-    return res.status(500).json({ 
-      success: false,
-      message: "Internal server error",
-      error: error.message 
-    });
-  }
-};
-
-const getItemById = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const item = await Item.findById(id)
-      .populate("category", "name")
-      .populate("subcategory", "name");
-
-    if (!item) {
-      return res.status(404).json({ message: "Item not found" });
-    }
-
-    return res.status(200).json({
-      message: "Item retrieved successfully",
-      item,
-    });
-  } catch (error) {
-    console.error("Error fetching item:", error);
+    console.error("Error fetching products:", error);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
 
-const updateItem = async (req, res) => {
+// ✅ Get Product by ID
+const getProductById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const product = await Product.findById(id)
+      .populate("category", "name")
+      .populate("subCategory", "name");
+
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Product retrieved successfully",
+      product,
+    });
+  } catch (error) {
+    console.error("Error fetching product:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// ✅ Update Product
+const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
     const updateData = req.body;
 
-    // If category or subcategory is being updated, validate them
+    // Validate category/subCategory if updating
     if (updateData.category) {
-      const categoryExists = await Category.findById(updateData.category);
-      if (!categoryExists) {
-        return res.status(400).json({
-          message: "Invalid category ID. Category does not exist.",
-        });
+      const categories = await Category.find({
+        _id: { $in: updateData.category },
+      });
+      if (!categories.length) {
+        return res.status(400).json({ message: "Invalid category IDs" });
       }
     }
 
-    if (updateData.subcategory) {
-      const subcategoryExists = await Subcategory.findById(
-        updateData.subcategory
-      );
-      if (!subcategoryExists) {
-        return res.status(400).json({
-          message: "Invalid subcategory ID. Subcategory does not exist.",
-        });
+    if (updateData.subCategory) {
+      const subCategories = await SubCategory.find({
+        _id: { $in: updateData.subCategory },
+      });
+      if (!subCategories.length) {
+        return res.status(400).json({ message: "Invalid subCategory IDs" });
       }
     }
 
-    const item = await Item.findByIdAndUpdate(id, updateData, {
+    const product = await Product.findByIdAndUpdate(id, updateData, {
       new: true,
       runValidators: true,
     })
       .populate("category", "name")
-      .populate("subcategory", "name");
+      .populate("subCategory", "name");
 
-    if (!item) {
-      return res.status(404).json({ message: "Item not found" });
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
     }
 
     return res.status(200).json({
-      message: "Item updated successfully",
-      item,
+      success: true,
+      message: "Product updated successfully",
+      product,
     });
   } catch (error) {
-    console.error("Error updating item:", error);
+    console.error("Error updating product:", error);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
 
-const deleteItem = async (req, res) => {
+// ✅ Delete Product
+const deleteProduct = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const item = await Item.findByIdAndDelete(id);
+    const product = await Product.findByIdAndDelete(id);
 
-    if (!item) {
-      return res.status(404).json({ message: "Item not found" });
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
     }
 
     return res.status(200).json({
-      message: "Item deleted successfully",
-      item,
+      success: true,
+      message: "Product deleted successfully",
+      product,
     });
   } catch (error) {
-    console.error("Error deleting item:", error);
+    console.error("Error deleting product:", error);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
 
-const categoryWiseItem = async (req, res) => {
+// ✅ Category wise products
+const categoryWiseProduct = async (req, res) => {
   try {
     const { category } = req.body;
 
     if (!category) {
-      return res.status(400).json({
-        message: "Category is required",
-        error: true,
-        success: false,
-      });
+      return res.status(400).json({ message: "Category is required" });
     }
 
-    // First find the category by name
     const categoryDoc = await Category.findOne({ name: category });
-
     if (!categoryDoc) {
-      return res.status(404).json({
-        message: "Category not found",
-        error: true,
-        success: false,
-      });
+      return res.status(404).json({ message: "Category not found" });
     }
 
-    // Then find items using the category ObjectId
-    const items = await Item.find({
-      category: categoryDoc._id,
-    }).populate("category"); // Optional: populate to get category details
+    const products = await Product.find({ category: categoryDoc._id }).populate(
+      "category"
+    );
 
     return res.status(200).json({
-      message: "Category wise Item List",
-      data: items,
-      category: category,
-      count: items.length,
-      error: false,
       success: true,
+      message: "Category wise products",
+      data: products,
+      count: products.length,
     });
   } catch (error) {
-    return res.status(500).json({
-      message: error.message || error,
-      error: true,
-      success: false,
-    });
+    return res.status(500).json({ message: error.message });
   }
 };
 
-const subCategoryWiseItem = async (req, res) => {
+// ✅ SubCategory wise products
+const subCategoryWiseProduct = async (req, res) => {
   try {
     const { subCategory } = req.body;
 
     if (!subCategory) {
-      return res.status(400).json({
-        message: "Sub Category is required",
-        error: true,
-        success: false,
-      });
+      return res.status(400).json({ message: "SubCategory is required" });
     }
 
-    const subCategoryDoc = await Subcategory.findOne({ name: subCategory });
-
-    // Check if subcategory exists
+    const subCategoryDoc = await SubCategory.findOne({ name: subCategory });
     if (!subCategoryDoc) {
-      return res.status(404).json({
-        message: "Sub Category not found",
-        error: true,
-        success: false
-      });
+      return res.status(404).json({ message: "SubCategory not found" });
     }
 
-    const items = await Item.find({
-      subCategory: subCategoryDoc._id
-    }).populate('subCategory'); // Optional: populate to get subcategory details
+    const products = await Product.find({
+      subCategory: subCategoryDoc._id,
+    }).populate("subCategory");
 
     return res.status(200).json({
-      message: "Sub-Category wise Item List",
-      data: items,
-      subCategory: subCategory, // Fixed: was 'category', should be 'subCategory'
-      count: items.length,
-      error: false,
-      success: true
+      success: true,
+      message: "SubCategory wise products",
+      data: products,
+      count: products.length,
     });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
   }
-  catch (error) {
-    return res.status(500).json({
-      message: error.message || error,
-      error: true,
-      success: false
-    });
-  } // Fixed: missing closing brace
 };
+
 module.exports = {
-  createItem,
-  getAllItems,
-  getItemById,
-  updateItem,
-  deleteItem,
-  categoryWiseItem,
-  subCategoryWiseItem
+  createProduct,
+  getAllProducts,
+  getProductById,
+  updateProduct,
+  deleteProduct,
+  categoryWiseProduct,
+  subCategoryWiseProduct,
 };

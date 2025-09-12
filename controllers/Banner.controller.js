@@ -1,125 +1,124 @@
 const { cloudinary } = require("../config/cloudinary");
-const BannerModel = require("../models/Banner.model");
+const AdsModel = require("../models/Banner.model"); // updated model import
 
-const createBanner = async (req, res) => {
+// Create Ad
+const createAd = async (req, res) => {
   try {
-    const { image, Description } = req.body;
+    const { image } = req.body;
 
-    if (!image || !Description) {
-      return res
-        .status(400)
-        .json({ message: "Image and Description are required" });
+    if (!image) {
+      return res.status(400).json({ message: "Image is required" });
     }
 
     const result = await cloudinary.uploader.upload(image, {
-      folder: "Banner",
+      folder: "Ads",
     });
 
-    const newPost = new BannerModel({
+    const newAd = new AdsModel({
       image: result.secure_url,
-      Description,
     });
 
-    await newPost.save();
+    await newAd.save();
     res.status(201).json({
-      message: "Banner post created successfully",
-      post: newPost,
+      success: true,
+      message: "Ad created successfully",
+      ad: newAd,
     });
   } catch (error) {
-    console.error("Error in Banner:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
+    console.error("Error in createAd:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Server error", error: error.message });
   }
 };
 
-const getAllBanners = async (req, res) => {
+// Get All Ads
+const getAllAds = async (req, res) => {
   try {
-    const banners = await BannerModel.find();
+    const ads = await AdsModel.find();
 
-    if (!banners || banners.length === 0) {
-      return res.status(404).json({ message: "No banners found" });
+    if (!ads || ads.length === 0) {
+      return res.status(404).json({ message: "No ads found" });
     }
 
     res.status(200).json({
       success: true,
-      count: banners.length,
-      banners,
+      count: ads.length,
+      ads,
     });
   } catch (error) {
-    console.error("Error in fetching banners:", error);
+    console.error("Error in getAllAds:", error);
     res.status(500).json({
       success: false,
-      message: "Server error while fetching banners",
+      message: "Server error while fetching ads",
       error: error.message,
     });
   }
 };
 
-// Update Banner
-const updateBanner = async (req, res) => {
+// Update Ad
+const updateAd = async (req, res) => {
   try {
     const { id } = req.params;
-    const { image, Description } = req.body;
+    const { image } = req.body;
 
-    let updatedData = { Description };
+    let updatedData = {};
 
     if (image) {
       const result = await cloudinary.uploader.upload(image, {
-        folder: "Banner",
+        folder: "Ads",
       });
       updatedData.image = result.secure_url;
     }
 
-    const banner = await BannerModel.findByIdAndUpdate(id, updatedData, {
+    const ad = await AdsModel.findByIdAndUpdate(id, updatedData, {
       new: true,
     });
 
-    if (!banner) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Banner not found" });
+    if (!ad) {
+      return res.status(404).json({ success: false, message: "Ad not found" });
     }
 
     res.status(200).json({
       success: true,
-      message: "Banner updated successfully",
-      banner,
+      message: "Ad updated successfully",
+      ad,
     });
   } catch (error) {
-    console.error("Error in updateBanner:", error);
+    console.error("Error in updateAd:", error);
     res
       .status(500)
       .json({ success: false, message: "Server error", error: error.message });
   }
 };
 
-// Delete Banner
-const deleteBanner = async (req, res) => {
+// Delete Ad
+const deleteAd = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const banner = await BannerModel.findByIdAndDelete(id);
+    const ad = await AdsModel.findByIdAndDelete(id);
 
-    if (!banner) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Banner not found" });
+    if (!ad) {
+      return res.status(404).json({ success: false, message: "Ad not found" });
     }
 
     res.status(200).json({
       success: true,
-      message: "Banner deleted successfully",
-      banner,
+      message: "Ad deleted successfully",
+      ad,
     });
   } catch (error) {
-    console.error("Error in deleteBanner:", error);
+    console.error("Error in deleteAd:", error);
     res
       .status(500)
       .json({ success: false, message: "Server error", error: error.message });
   }
 };
+
 module.exports = {
-  createBanner,
-  getAllBanners,
-  updateBanner,
-  deleteBanner,
+  createAd,
+  getAllAds,
+  updateAd,
+  deleteAd,
 };

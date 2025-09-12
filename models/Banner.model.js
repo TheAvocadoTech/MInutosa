@@ -5,10 +5,6 @@ const addScheme = new mongoose.Schema({
     type: String,
     // require: true
   },
-  Description: {
-    type: String,
-    require: true,
-  },
 });
 
 module.exports = mongoose.model("Ads", addScheme);

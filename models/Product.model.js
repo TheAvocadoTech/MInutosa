@@ -1,82 +1,42 @@
-// const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
-// const productSchema = new mongoose.Schema({
-//   productId:{
-//     type:String,
-//     required:true
-//   },
-//   name: {
-//     type: String,
-//     required: true,
-//     trim: true,
-//   },
-//   brand: {
-//     type: String,
-//     required: true,
-//   },
-//   description: String,
+const productSchema = new mongoose.Schema(
+  {
+    name: { type: String },
+    images: {
+      type: [String], // multiple images
+      default: [],
+    },
+    category: [
+      {
+        type: mongoose.Schema.ObjectId,
+        ref: "Category",
+      },
+    ],
+    subCategory: [
+      {
+        type: mongoose.Schema.ObjectId,
+        ref: "subCategory",
+      },
+    ],
+    unit: { type: String, default: "" },
+    stock: { type: Number, default: null },
+    price: { type: Number, default: null },
+    originalPrice: { type: Number, default: null },
+    discountedMRP: { type: Number, default: null },
+    discount: { type: Number, default: null },
+    amountSaving: { type: Number, default: null },
+    description: { type: String, default: "" },
+    pack: { type: String, default: "" },
+    productName: { type: String, default: "" },
+    rating: { type: Number, default: null },
+    more_details: { type: Object, default: {} },
+  },
+  { timestamps: true }
+);
 
-//   images: [
-//     {
-//       url: { type: String, required: true },
-//       alt: { type: String },
-//     }
-//   ],
+// ✅ Fix: Remove duplicate "price" field (was declared twice)
 
-//   price: {
-//     mrp: { type: Number, required: true },
-//     sellingPrice: { type: Number, required: true },
-//     discountPercent: { type: Number, default: 0 },
-//   },
+const ProductModel = mongoose.model("product", productSchema);
 
-//   unit: {
-//     quantity: { type: Number, required: true },
-//     unitType: { type: String, enum: ['g', 'kg', 'ml', 'l', 'pack', 'pcs'], required: true },
-//   },
-
-//   category: {
-//     type: mongoose.Schema.Types.ObjectId,
-//     ref: 'Category',
-//     required: true,
-//   },
-
-//   subcategory: {
-//     type: mongoose.Schema.Types.ObjectId,
-//     ref: 'SubCategory',
-//     required: true,
-//   },
-
-//   stock: {
-//     type: Number,
-//     required: true,
-//     default: 0,
-//   },
-
-//   isAvailable: {
-//     type: Boolean,
-//     default: true,
-//   },
-
-//   tags: [String],
-
-//   expiryDate: Date,
-
-//   warehouseLocation: String,
-
-//   deliveryTimeEstimate: {
-//     type: String, // Example: "10 mins"
-//   },
-
-//   rating: {
-//     average: { type: Number, default: 0 },
-//     totalReviews: { type: Number, default: 0 },
-//   },
-
-//   vendor: {
-//     type: mongoose.Schema.Types.ObjectId,
-//     ref: 'Vendor', // If vendors are managed separately
-//   },
-
-// }, { timestamps: true });
-
-// module.exports = mongoose.model('Product', productSchema);
+module.exports = ProductModel;
