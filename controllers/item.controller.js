@@ -207,6 +207,77 @@ const categoryWiseProduct = async (req, res) => {
     return res.status(500).json({ message: error.message });
   }
 };
+const bulkUploadProducts = async (req, res) => {
+  try {
+    const { products } = req.body;
+
+    if (!products || !Array.isArray(products) || products.length === 0) {
+      return res.status(400).json({ message: "Products array is required" });
+    }
+
+    const validatedProducts = [];
+
+    for (const productData of products) {
+      // ✅ Check required fields
+      if (
+        !productData.name ||
+        !productData.category ||
+        !productData.subCategory
+      ) {
+        return res.status(400).json({
+          message: "Each product must include name, category, and subCategory",
+          product: productData,
+        });
+      }
+
+      // ✅ Validate category IDs
+      const categories = await Category.find({
+        _id: { $in: productData.category },
+      });
+      if (!categories.length) {
+        return res.status(400).json({
+          message: `Invalid category IDs for product: ${productData.name}`,
+        });
+      }
+
+      // ✅ Validate subCategory IDs
+      const subCategories = await SubCategory.find({
+        _id: { $in: productData.subCategory },
+      });
+      if (!subCategories.length) {
+        return res.status(400).json({
+          message: `Invalid subCategory IDs for product: ${productData.name}`,
+        });
+      }
+
+      validatedProducts.push(productData);
+    }
+
+    // ✅ Insert all products at once
+    const insertedProducts = await Product.insertMany(validatedProducts, {
+      ordered: false,
+    });
+
+    // ✅ Populate category and subCategory for response
+    const populatedProducts = await Product.find({
+      _id: { $in: insertedProducts.map((p) => p._id) },
+    })
+      .populate("category", "name")
+      .populate("subCategory", "name");
+
+    return res.status(201).json({
+      success: true,
+      message: `${insertedProducts.length} products uploaded successfully`,
+      data: populatedProducts,
+    });
+  } catch (error) {
+    console.error("Error in bulk upload:", error);
+    return res.status(500).json({
+      message: "Internal server error during bulk upload",
+      error: error.message,
+    });
+  }
+};
 
 // ✅ SubCategory wise products
 const subCategoryWiseProduct = async (req, res) => {
