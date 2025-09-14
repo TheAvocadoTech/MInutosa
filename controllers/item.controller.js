@@ -308,6 +308,8 @@ const subCategoryWiseProduct = async (req, res) => {
   }
 };
 
+// ✅ Bulk Upload Products
+
 module.exports = {
   createProduct,
   getAllProducts,
@@ -316,4 +318,5 @@ module.exports = {
   deleteProduct,
   categoryWiseProduct,
   subCategoryWiseProduct,
+  bulkUploadProducts,
 };

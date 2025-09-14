@@ -16,7 +16,7 @@ router.get("/", getAllProducts); // Get all products
 router.get("/:id", getProductById); // Get product by ID
 router.put("/:id", updateProduct); // Update product
 router.delete("/:id", deleteProduct); // Delete product
-
+router.post("/bulk-upload", productController.bulkUploadProducts);
 // ✅ Extra Filters
 router.post("/by-category", categoryWiseProduct); // Products by category name
 router.post("/by-subcategory", subCategoryWiseProduct); // Products by subCategory name
