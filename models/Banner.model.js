@@ -5,9 +5,9 @@ const bannerSchema = new mongoose.Schema(
     homeBanner1: {
       type: String, // Single image URL
     },
-    advertiseBanners: {
-      type: [String], // Multiple image URLs
-      default: [],
+  advertiseBanners: {
+    type: [String], // Multiple image URLs
+    default: [],
     },
     homeBanner2: {
       type: String,
