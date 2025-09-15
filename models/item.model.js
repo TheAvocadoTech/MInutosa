@@ -41,11 +41,7 @@ const productSchema = new mongoose.Schema(
       required: true,
     },
 
-    subcategory: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "subCat", // ✅ Matches model name exactly
-      required: true,
-    },
+    subCategory: { type: mongoose.Schema.Types.ObjectId, ref: "SubCategory" },
 
     stock: {
       type: Number,

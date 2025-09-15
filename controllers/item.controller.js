@@ -1,7 +1,7 @@
+const mongoose = require("mongoose");
 const Product = require("../models/Product.model");
 const Category = require("../models/Category.model");
 const SubCategory = require("../models/subCategory.model");
-const mongoose = require("mongoose");
 
 // ✅ Create Product
 const createProduct = async (req, res) => {
@@ -63,27 +63,18 @@ const createProduct = async (req, res) => {
 // ✅ Get All Products
 const getAllProducts = async (req, res) => {
   try {
-    const { category, subCategory, name } = req.query;
-
-    const filter = {};
-    if (category) filter.category = category;
-    if (subCategory) filter.subCategory = subCategory;
-    if (name) filter.name = new RegExp(name, "i");
-
-    const products = await Product.find(filter)
-      .populate("category", "name")
-      .populate("subCategory", "name")
-      .sort({ createdAt: -1 });
+    const products = await Product.find();
+    console.log("Connected DB:", mongoose.connection.name);
+    console.log("Products fetched:", products.length);
 
     return res.status(200).json({
       success: true,
-      message: "Products retrieved successfully",
       data: products,
       total: products.length,
     });
-  } catch (error) {
-    console.error("Error fetching products:", error);
-    return res.status(500).json({ message: "Internal server error" });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Internal Server Error" });
   }
 };
 
@@ -91,6 +82,10 @@ const getAllProducts = async (req, res) => {
 const getProductById = async (req, res) => {
   try {
     const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid product ID" });
+    }
 
     const product = await Product.findById(id)
       .populate("category", "name")
@@ -110,7 +105,6 @@ const getProductById = async (req, res) => {
     return res.status(500).json({ message: "Internal server error" });
   }
 };
-
 // ✅ Update Product
 const updateProduct = async (req, res) => {
   try {
@@ -208,243 +202,46 @@ const categoryWiseProduct = async (req, res) => {
     return res.status(500).json({ message: error.message });
   }
 };
-const bulkUploadProducts = async (req, res) => {
-  try {
-    const { products } = req.body;
-
-    if (!products || !Array.isArray(products) || products.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Products array is required",
-      });
-    }
-
-    const validatedProducts = [];
-    const errors = [];
-
-    for (let i = 0; i < products.length; i++) {
-      const productData = products[i];
-
-      // ✅ Check required fields
-      if (!productData.name || productData.name.trim() === "") {
-        errors.push(`Product ${i + 1}: Name is required`);
-        continue;
-      }
-
-      // ✅ Check if category array exists and has valid IDs
-      if (
-        !productData.category ||
-        !Array.isArray(productData.category) ||
-        productData.category.length === 0
-      ) {
-        errors.push(
-          `Product ${i + 1} (${productData.name}): Category is required`
-        );
-        continue;
-      }
-
-      // ✅ Validate category IDs exist in database
-      const categoryIds = productData.category.map((cat) => cat._id || cat);
-      const categories = await Category.find({
-        _id: { $in: categoryIds },
-      });
-
-      if (categories.length !== categoryIds.length) {
-        errors.push(
-          `Product ${i + 1} (${productData.name}): Invalid category IDs`
-        );
-        continue;
-      }
-
-      // ✅ Validate subCategory IDs (optional field)
-      let subCategories = [];
-      if (
-        productData.subCategory &&
-        Array.isArray(productData.subCategory) &&
-        productData.subCategory.length > 0
-      ) {
-        const subCategoryIds = productData.subCategory.map(
-          (sub) => sub._id || sub
-        );
-        subCategories = await SubCategory.find({
-          _id: { $in: subCategoryIds },
-        });
-
-        if (subCategories.length !== subCategoryIds.length) {
-          errors.push(
-            `Product ${i + 1} (${productData.name}): Invalid subCategory IDs`
-          );
-          continue;
-        }
-      }
-
-      // ✅ Check for duplicate product names
-      const existingProduct = await Product.findOne({
-        name: { $regex: new RegExp(`^${productData.name.trim()}$`, "i") },
-      });
-
-      if (existingProduct) {
-        errors.push(
-          `Product ${i + 1} (${
-            productData.name
-          }): Product with this name already exists`
-        );
-        continue;
-      }
-
-      // ✅ Prepare product data for insertion
-      const processedProduct = {
-        name: productData.name.trim(),
-        productName: productData.productName?.trim() || productData.name.trim(),
-        category: categoryIds,
-        subCategory: productData.subCategory
-          ? productData.subCategory.map((sub) => sub._id || sub)
-          : [],
-        unit: productData.unit?.trim() || "piece",
-        pack: productData.pack?.toString()?.trim() || "1",
-        description: productData.description?.trim() || "",
-        stock: Number(productData.stock) || 0,
-        originalPrice: Number(productData.originalPrice) || 0,
-        discountedMRP:
-          Number(productData.discountedMRP) ||
-          Number(productData.originalPrice) ||
-          0,
-        rating: Math.min(Math.max(Number(productData.rating) || 0, 0), 5), // Ensure rating is between 0-5
-        images: Array.isArray(productData.images)
-          ? productData.images.filter((img) => img && img.trim())
-          : [],
-        more_details: {
-          brand: productData.more_details?.brand?.trim() || "",
-          expiry: productData.more_details?.expiry?.trim() || "",
-          ...productData.more_details,
-        },
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      validatedProducts.push(processedProduct);
-    }
-
-    // ✅ If there are validation errors, return them
-    if (errors.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Validation errors found",
-        errors: errors,
-        validProductsCount: validatedProducts.length,
-        totalProductsCount: products.length,
-      });
-    }
-
-    if (validatedProducts.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "No valid products to insert",
-      });
-    }
-
-    // ✅ Insert all products at once
-    const insertedProducts = await Product.insertMany(validatedProducts, {
-      ordered: false, // Continue inserting even if some fail
-    });
-
-    // ✅ Populate category and subCategory for response
-    const populatedProducts = await Product.find({
-      _id: { $in: insertedProducts.map((p) => p._id) },
-    })
-      .populate("category", "name")
-      .populate("subCategory", "name");
-
-    return res.status(201).json({
-      success: true,
-      message: `${insertedProducts.length} products uploaded successfully`,
-      created: insertedProducts.length,
-      data: populatedProducts,
-    });
-  } catch (error) {
-    console.error("Error in bulk upload:", error);
-
-    // Handle duplicate key errors specifically
-    if (error.code === 11000) {
-      return res.status(400).json({
-        success: false,
-        message: "Duplicate product names found",
-        error: error.message,
-      });
-    }
-
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error during bulk upload",
-      error: error.message,
-    });
-  }
-};
 
 // ✅ SubCategory wise products
-const subCategoryWiseProduct = async (req, res) => {
-  try {
-    const { subCategory } = req.body;
-
-    if (!subCategory) {
-      return res.status(400).json({ message: "SubCategory is required" });
-    }
-
-    const subCategoryDoc = await SubCategory.findOne({ name: subCategory });
-    if (!subCategoryDoc) {
-      return res.status(404).json({ message: "SubCategory not found" });
-    }
-
-    const products = await Product.find({
-      subCategory: subCategoryDoc._id,
-    }).populate("subCategory");
-
-    return res.status(200).json({
-      success: true,
-      message: "SubCategory wise products",
-      data: products,
-      count: products.length,
-    });
-  } catch (error) {
-    return res.status(500).json({ message: error.message });
-  }
-};
 const getProductsBySubCategories = async (req, res) => {
   try {
-    const { subCategories } = req.body;
+    let { subCategories } = req.query;
 
-    if (
-      !subCategories ||
-      !Array.isArray(subCategories) ||
-      !subCategories.length
-    ) {
+    if (!subCategories) {
       return res
         .status(400)
-        .json({ message: "subCategories array is required" });
+        .json({ message: "subCategories query is required" });
     }
 
-    // Case-insensitive regex for names
-    const regexNames = subCategories.map(
-      (name) => new RegExp(`^${name}$`, "i")
-    );
+    // Split comma-separated string into array
+    if (typeof subCategories === "string") {
+      subCategories = subCategories.split(",");
+    }
 
-    const products = await Product.find()
-      .populate({
-        path: "subCategory",
-        match: { name: { $in: regexNames } },
-        select: "name",
-      })
+    // Check if we're dealing with ObjectIds or names
+    const isObjectId = (id) => /^[0-9a-fA-F]{24}$/.test(id.trim());
+
+    let query;
+    if (subCategories.every(isObjectId)) {
+      const subCategoryIds = subCategories.map(
+        (id) => new mongoose.Types.ObjectId(id.trim())
+      );
+      query = { subCategory: { $in: subCategoryIds } };
+    } else {
+      query = { "subCategory.name": { $in: subCategories } };
+    }
+
+    const products = await Product.find(query)
+      .populate("subCategory", "name")
       .populate("category", "name")
       .sort({ createdAt: -1 });
-
-    // Filter only products where subCategory matched
-    const filteredProducts = products.filter((p) => p.subCategory);
 
     return res.status(200).json({
       success: true,
       message: "Products fetched successfully",
-      total: filteredProducts.length,
-      data: filteredProducts,
+      total: products.length,
+      data: products,
     });
   } catch (error) {
     console.error("Error fetching products by subCategories:", error);
@@ -455,6 +252,7 @@ const getProductsBySubCategories = async (req, res) => {
     });
   }
 };
+
 // ✅ Bulk Upload Products
 
 module.exports = {
@@ -464,7 +262,6 @@ module.exports = {
   updateProduct,
   deleteProduct,
   categoryWiseProduct,
-  subCategoryWiseProduct,
-  bulkUploadProducts,
+  // bulkUploadProducts,
   getProductsBySubCategories,
 };

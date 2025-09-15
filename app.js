@@ -12,11 +12,16 @@ const connectDB = require("./config/db");
 const UserRoutes = require("./routes/Users.routes");
 const Banner = require("./routes/Banner.routes");
 const Category = require("./routes/category.routes");
-const Product = require("./routes/product.routes");
+const Products = require("./routes/product.routes");
 const SubCategory = require("./routes/subCategory.routes");
 // Middleware
 app.use(helmet());
-app.use(cors());
+app.use(
+  cors({
+    origin: "http://localhost:3000", // Your frontend URL
+    credentials: true,
+  })
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 //authentication routes
@@ -25,8 +30,9 @@ app.use("/api/auth", UserRoutes);
 app.use("/api/ads", Banner);
 //Category
 app.use("/api/category", Category);
-app.use("/api/product", Product);
+
 app.use("/api/subcategory", SubCategory);
+app.use("/api/product", Products);
 // Health check
 app.get("/", (req, res) => {
   res.send("You are connected");
