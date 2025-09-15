@@ -8,7 +8,7 @@ const {
   updateItem,
   deleteItem,
   categoryWiseItem,
-  subCategoryWiseItem,
+  getProductsBySubCategories,
 } = require("../controllers/item.controller");
 
 router.post("/createItem", createItem); // Create item
@@ -17,7 +17,7 @@ router.get("/getItemById/:id", getItemById); // Get item by ID
 router.put("/updateItem/:id", updateItem); // Update item by ID
 router.delete("/deleteItem/:id", deleteItem); // Delete item by ID
 router.post("/categoryWiseItem", categoryWiseItem); // Category wise Item
-router.post("/subCategoryWiseItem", subCategoryWiseItem);
+router.post("/by-subcategories", getProductsBySubCategories);
 router.post("/bulk", bulkUploadProducts);
 
 // Sub category wise Item

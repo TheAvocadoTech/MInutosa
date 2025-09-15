@@ -6,8 +6,9 @@ const {
   updateProduct,
   deleteProduct,
   categoryWiseProduct,
-  subCategoryWiseProduct,
+  // subCategoryWiseProduct,
   bulkUploadProducts,
+  getProductsBySubCategories,
 } = require("../controllers/item.controller");
 const router = express.Router();
 
@@ -20,6 +21,5 @@ router.delete("/:id", deleteProduct); // Delete product
 router.post("/bulk-upload", bulkUploadProducts);
 // ✅ Extra Filters
 router.post("/by-category", categoryWiseProduct); // Products by category name
-router.post("/by-subcategory", subCategoryWiseProduct); // Products by subCategory name
-
+router.post("/by-subcategories", getProductsBySubCategories);
 module.exports = router;

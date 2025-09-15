@@ -1,6 +1,7 @@
 const Product = require("../models/Product.model");
 const Category = require("../models/Category.model");
 const SubCategory = require("../models/subCategory.model");
+const mongoose = require("mongoose");
 
 // ✅ Create Product
 const createProduct = async (req, res) => {
@@ -408,7 +409,52 @@ const subCategoryWiseProduct = async (req, res) => {
     return res.status(500).json({ message: error.message });
   }
 };
+const getProductsBySubCategories = async (req, res) => {
+  try {
+    const { subCategories } = req.body;
 
+    if (
+      !subCategories ||
+      !Array.isArray(subCategories) ||
+      !subCategories.length
+    ) {
+      return res
+        .status(400)
+        .json({ message: "subCategories array is required" });
+    }
+
+    // Case-insensitive regex for names
+    const regexNames = subCategories.map(
+      (name) => new RegExp(`^${name}$`, "i")
+    );
+
+    const products = await Product.find()
+      .populate({
+        path: "subCategory",
+        match: { name: { $in: regexNames } },
+        select: "name",
+      })
+      .populate("category", "name")
+      .sort({ createdAt: -1 });
+
+    // Filter only products where subCategory matched
+    const filteredProducts = products.filter((p) => p.subCategory);
+
+    return res.status(200).json({
+      success: true,
+      message: "Products fetched successfully",
+      total: filteredProducts.length,
+      data: filteredProducts,
+    });
+  } catch (error) {
+    console.error("Error fetching products by subCategories:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
 // ✅ Bulk Upload Products
 
 module.exports = {
@@ -420,4 +466,5 @@ module.exports = {
   categoryWiseProduct,
   subCategoryWiseProduct,
   bulkUploadProducts,
+  getProductsBySubCategories,
 };
