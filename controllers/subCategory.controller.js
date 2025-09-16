@@ -116,6 +116,45 @@ const getSubcategories = async (req, res) => {
   }
 };
 
+const getProductsByCategory = async (req, res) => {
+  try {
+    const { category } = req.params; // category can be ID or name
+    const { page = 1, limit = 20 } = req.query;
+
+    // Use helper to find by ID or name
+    const categoryDoc = await findCategory(category);
+    if (!categoryDoc) {
+      return res.status(404).json({ message: "Category not found" });
+    }
+
+    const skip = (page - 1) * limit;
+
+    const products = await Product.find({ category: categoryDoc._id })
+      .populate("category", "name")
+      .populate("subcategory", "name")
+      .skip(skip)
+      .limit(Number(limit))
+      .sort({ createdAt: -1 });
+
+    const total = await Product.countDocuments({ category: categoryDoc._id });
+
+    return res.status(200).json({
+      message: "Products retrieved successfully",
+      category: categoryDoc.name,
+      products,
+      pagination: {
+        total,
+        page: Number(page),
+        limit: Number(limit),
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching products by category:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 // READ Subcategory by ID
 const getSubcategoryById = async (req, res) => {
   try {
@@ -279,4 +318,5 @@ module.exports = {
   getSubcategoriesByCategory,
   updateSubcategory,
   deleteSubcategory,
+  getProductsByCategory,
 };
