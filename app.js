@@ -16,12 +16,7 @@ const Products = require("./routes/product.routes");
 const SubCategory = require("./routes/subCategory.routes");
 // Middleware
 app.use(helmet());
-app.use(
-  cors({
-    origin: "http://localhost:3000", // Your frontend URL
-    credentials: true,
-  })
-);
+app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 //authentication routes
