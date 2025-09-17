@@ -1,6 +1,8 @@
 const Category = require("../models/Category.model");
 const SubCategory = require("../models/subCategory.model");
-
+const csv = require("csv-parser");
+const fs = require("fs");
+const path = require("path");
 // Create Category
 const createcategory = async (req, res) => {
   try {
@@ -81,7 +83,76 @@ const getAllCategories = async (req, res) => {
     });
   }
 };
+const bulkUploadCategories = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "CSV file is required" });
+    }
 
+    const filePath = path.join(__dirname, "../uploads", req.file.filename);
+    const categoriesData = [];
+
+    // Read and parse CSV
+    fs.createReadStream(filePath)
+      .pipe(csv())
+      .on("data", (row) => {
+        // Expecting CSV columns: name,image
+        if (row.name) {
+          categoriesData.push({
+            name: row.name.trim(),
+            image: row.image ? row.image.trim() : null,
+          });
+        }
+      })
+      .on("end", async () => {
+        try {
+          const insertedCategories = [];
+          const skippedCategories = [];
+
+          for (let category of categoriesData) {
+            // Check if category already exists
+            const exists = await Category.findOne({
+              name: category.name.toLowerCase(),
+            });
+
+            if (!exists) {
+              const newCategory = new Category({
+                name: category.name,
+                image: category.image,
+              });
+              await newCategory.save();
+              insertedCategories.push(newCategory);
+            } else {
+              skippedCategories.push(category.name);
+            }
+          }
+
+          // Delete CSV after processing
+          fs.unlinkSync(filePath);
+
+          return res.status(201).json({
+            message: "Bulk categories uploaded successfully",
+            insertedCount: insertedCategories.length,
+            skippedCount: skippedCategories.length,
+            insertedCategories,
+            skippedCategories,
+          });
+        } catch (error) {
+          console.error("Error in bulkUploadCategories:", error);
+          return res.status(500).json({
+            message: "Error saving categories",
+            error: error.message,
+          });
+        }
+      });
+  } catch (error) {
+    console.error("Error in bulkUploadCategories:", error);
+    res.status(500).json({
+      message: "Server Error",
+      error: error.message,
+    });
+  }
+};
 // Update Category
 const updateCategory = async (req, res) => {
   try {
@@ -205,4 +276,5 @@ module.exports = {
   updateCategory,
   deleteCategory,
   getSubCategoriesByCategory,
+  bulkUploadCategories,
 };

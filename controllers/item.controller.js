@@ -63,9 +63,10 @@ const createProduct = async (req, res) => {
 // ✅ Get All Products
 const getAllProducts = async (req, res) => {
   try {
-    const products = await Product.find();
-    console.log("Connected DB:", mongoose.connection.name);
-    console.log("Products fetched:", products.length);
+    const products = await Product.find()
+      .populate("category", "name")
+      .populate("subCategory", "name")
+      .sort({ createdAt: -1 });
 
     return res.status(200).json({
       success: true,

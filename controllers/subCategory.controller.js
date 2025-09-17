@@ -1,6 +1,10 @@
 const mongoose = require("mongoose");
 const Subcategory = require("../models/subCategory.model");
 const Category = require("../models/Category.model");
+const csv = require("csv-parser");
+const fs = require("fs");
+const path = require("path");
+const multer = require("multer");
 
 // ================= Helper Functions ================= //
 
@@ -8,12 +12,6 @@ const Category = require("../models/Category.model");
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 // Find category by ID or name
-const findCategory = async (categoryInput) => {
-  if (isValidObjectId(categoryInput)) {
-    return await Category.findById(categoryInput);
-  }
-  return await Category.findOne({ name: categoryInput });
-};
 
 // ================= CRUD Controllers ================= //
 
@@ -338,7 +336,142 @@ const deleteSubcategory = async (req, res) => {
     return res.status(500).json({ message: "Internal server error" });
   }
 };
+const findCategory = async (categoryInput) => {
+  if (!categoryInput) return null;
 
+  // Try to find by ObjectId first
+  if (mongoose.Types.ObjectId.isValid(categoryInput)) {
+    const cat = await Category.findById(categoryInput);
+    if (cat) return cat;
+  }
+
+  // Otherwise, find by name (case-insensitive)
+  const catByName = await Category.findOne({ name: categoryInput.trim() });
+  return catByName;
+};
+const bulkUploadSubcategories = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "CSV file is required" });
+    }
+
+    const filePath = path.join(__dirname, "..", req.file.path);
+    const subcategoriesToInsert = [];
+
+    fs.createReadStream(filePath)
+      .pipe(csv())
+      .on("data", (row) => {
+        const name = row.name?.trim();
+        const category = row.category?.trim();
+        const image = row.image?.trim();
+
+        if (name && category && image) {
+          subcategoriesToInsert.push({ name, category, image });
+        }
+      })
+      .on("end", async () => {
+        try {
+          const inserted = [];
+          const skipped = [];
+
+          for (const sub of subcategoriesToInsert) {
+            try {
+              // Improved category lookup - handle both ObjectId and name
+              let categoryExists;
+
+              // Check if category value is a valid ObjectId
+              if (mongoose.Types.ObjectId.isValid(sub.category)) {
+                categoryExists = await Category.findById(sub.category);
+              } else {
+                // If not ObjectId, search by name (case-insensitive)
+                categoryExists = await Category.findOne({
+                  name: { $regex: new RegExp(`^${sub.category}$`, "i") },
+                });
+              }
+
+              if (!categoryExists) {
+                skipped.push({ ...sub, reason: "Category not found" });
+                continue;
+              }
+
+              // Check for duplicate subcategory (case-insensitive name check)
+              const existing = await Subcategory.findOne({
+                name: { $regex: new RegExp(`^${sub.name}$`, "i") },
+                category: categoryExists._id,
+              });
+
+              if (existing) {
+                skipped.push({ ...sub, reason: "Duplicate subcategory" });
+                continue;
+              }
+
+              // Create new subcategory
+              const newSub = await Subcategory.create({
+                name: sub.name,
+                category: categoryExists._id,
+                image: sub.image,
+              });
+
+              inserted.push(newSub);
+            } catch (err) {
+              console.error(`Error processing subcategory ${sub.name}:`, err);
+              skipped.push({ ...sub, reason: err.message });
+            }
+          }
+
+          // Remove CSV file after processing
+          try {
+            fs.unlinkSync(filePath);
+          } catch (fileErr) {
+            console.error("Error removing CSV file:", fileErr);
+          }
+
+          return res.status(201).json({
+            message: "Bulk subcategories upload completed",
+            insertedCount: inserted.length,
+            skippedCount: skipped.length,
+            insertedSubcategories: inserted,
+            skippedSubcategories: skipped,
+          });
+        } catch (processingError) {
+          console.error("Error processing CSV data:", processingError);
+
+          // Clean up file on error
+          try {
+            fs.unlinkSync(filePath);
+          } catch (fileErr) {
+            console.error("Error removing CSV file:", fileErr);
+          }
+
+          return res.status(500).json({
+            message: "Error processing CSV data",
+            error: processingError.message,
+          });
+        }
+      })
+      .on("error", (streamError) => {
+        console.error("CSV parsing error:", streamError);
+
+        // Clean up file on stream error
+        try {
+          fs.unlinkSync(filePath);
+        } catch (fileErr) {
+          console.error("Error removing CSV file:", fileErr);
+        }
+
+        return res.status(400).json({
+          message: "Error parsing CSV file",
+          error: streamError.message,
+        });
+      });
+  } catch (error) {
+    console.error("Error bulk uploading subcategories:", error);
+    return res.status(500).json({
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
 // ================= Export ================= //
 module.exports = {
   createSubcategory,
@@ -349,4 +482,5 @@ module.exports = {
   deleteSubcategory,
   getProductsByCategory,
   getAllCategoriesWithSubcategories,
+  bulkUploadSubcategories,
 };

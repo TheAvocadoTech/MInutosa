@@ -1,6 +1,7 @@
 // routes/subcategory.routes.js
 const express = require("express");
 const router = express.Router();
+const multer = require("multer");
 
 const {
   createSubcategory,
@@ -10,7 +11,10 @@ const {
   updateSubcategory,
   deleteSubcategory,
   getAllCategoriesWithSubcategories,
+  bulkUploadSubcategories,
 } = require("../controllers/subCategory.controller");
+
+const upload = multer({ dest: "uploads/" });
 
 // ================= Routes ================= //
 
@@ -31,5 +35,11 @@ router.put("/:id", updateSubcategory);
 
 // Delete
 router.delete("/:id", deleteSubcategory);
+//bulk upload
+router.post(
+  "/subcategories/bulk-upload",
+  upload.single("file"),
+  bulkUploadSubcategories
+);
 
 module.exports = router;
