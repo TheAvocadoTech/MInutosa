@@ -9,6 +9,7 @@ const {
   getSubcategoriesByCategory,
   updateSubcategory,
   deleteSubcategory,
+  getAllCategoriesWithSubcategories,
 } = require("../controllers/subCategory.controller");
 
 // ================= Routes ================= //
@@ -18,7 +19,7 @@ router.post("/", createSubcategory);
 
 // Read (all, with optional query filters)
 router.get("/", getSubcategories);
-
+router.get("/categories-with-subcategories", getAllCategoriesWithSubcategories);
 // Read (single by ID)
 router.get("/:id", getSubcategoryById);
 

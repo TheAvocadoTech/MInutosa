@@ -212,7 +212,36 @@ const getSubcategoriesByCategory = async (req, res) => {
     return res.status(500).json({ message: "Internal server error" });
   }
 };
+const getAllCategoriesWithSubcategories = async (req, res) => {
+  try {
+    const categories = await Category.find().sort({ name: 1 });
 
+    const results = await Promise.all(
+      categories.map(async (cat) => {
+        const subcategories = await Subcategory.find({ category: cat._id })
+          .populate("category", "name")
+          .sort({ name: 1 });
+
+        return {
+          _id: cat._id,
+          name: cat.name,
+          image: cat.image || null, // if your Category has image field
+          subcategories,
+          subcategoryCount: subcategories.length,
+        };
+      })
+    );
+
+    return res.status(200).json({
+      message: "Categories with subcategories retrieved successfully",
+      count: results.length,
+      categories: results,
+    });
+  } catch (error) {
+    console.error("Error fetching categories with subcategories:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
 // UPDATE Subcategory
 const updateSubcategory = async (req, res) => {
   try {
@@ -319,4 +348,5 @@ module.exports = {
   updateSubcategory,
   deleteSubcategory,
   getProductsByCategory,
+  getAllCategoriesWithSubcategories,
 };
