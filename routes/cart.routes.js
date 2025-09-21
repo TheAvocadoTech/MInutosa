@@ -17,6 +17,6 @@ router.post("/add", addToCart);
 router.put("/update", updateQuantity);
 
 // ✅ Remove from cart
-router.delete("/remove", removeFromCart);
-
+// Change this line in your routes file
+router.post("/remove", removeFromCart); // Changed from DELETE to POST
 module.exports = router;
