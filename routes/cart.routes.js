@@ -1,19 +1,22 @@
-// routes/cartRoutes.js
-const express = require('express');
+const express = require("express");
+const {
+  userCart: getUserCart,
+  addToCart,
+  updateQuantity,
+  removeFromCart,
+} = require("../controllers/cart.controller");
 const router = express.Router();
 
-const { userCart, addToCart, removeFromCart, updateQuantity } = require('../controllers/cart.controller');
+// ✅ Get user cart
+router.get("/", getUserCart);
 
-// Get user cart
-router.get('/getcart', userCart);
+// ✅ Add product to cart
+router.post("/add", addToCart);
 
-// Add to cart
-router.post('/cart/add', addToCart);
+// ✅ Update quantity
+router.put("/update", updateQuantity);
 
-// Remove from cart
-router.post('/cart/remove', removeFromCart);
-
-// Update quantity
-router.post('/cart/update', updateQuantity);
+// ✅ Remove from cart
+router.delete("/remove", removeFromCart);
 
 module.exports = router;

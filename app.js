@@ -14,6 +14,7 @@ const Banner = require("./routes/Banner.routes");
 const Category = require("./routes/category.routes");
 const Products = require("./routes/product.routes");
 const SubCategory = require("./routes/subCategory.routes");
+const Cart = require("./routes/cart.routes");
 // Middleware
 app.use(helmet());
 app.use(cors());
@@ -28,6 +29,7 @@ app.use("/api/category", Category);
 
 app.use("/api/subcategory", SubCategory);
 app.use("/api/product", Products);
+app.use("/api/cart", Cart);
 // Health check
 app.get("/", (req, res) => {
   res.send("You are connected");
