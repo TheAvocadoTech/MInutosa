@@ -35,8 +35,6 @@ const productSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// ✅ Fix: Remove duplicate "price" field (was declared twice)
-
-const ProductModel = mongoose.model("product", productSchema);
+const ProductModel = mongoose.model("Product", productSchema);
 
 module.exports = ProductModel;

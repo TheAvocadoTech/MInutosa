@@ -14,8 +14,9 @@ const userCart = async (req, res) => {
   if (!userId) return res.status(400).json({ message: "userId is required" });
 
   try {
-    const cart = await Cart.findOne({ user: userId }).populate("items.product");
-
+    const cart = await Cart.findOne({ user: userId }).populate(
+      "items.productId"
+    );
     if (!cart) {
       return res.status(200).json({
         message: "Cart is empty",
