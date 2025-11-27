@@ -1,8 +1,10 @@
-const  express = require('express');
-const { createAdmin } = require('../controllers/admin.controller');
+const express = require("express");
+const { loginAdmin } = require("../controllers/admin.controller");
+const {
+  requireAdmin,
+  authMiddleware,
+} = require("../middleware/auth.middleware");
 const router = express.Router();
 
-router.post('/createadmins', createAdmin);
-
-
+router.post("/adminLogin", loginAdmin);
 module.exports = router;
