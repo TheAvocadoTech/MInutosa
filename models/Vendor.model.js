@@ -2,7 +2,13 @@ const mongoose = require("mongoose");
 
 const vendorSchema = new mongoose.Schema(
   {
-    name: {
+    firstName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    lastName: {
       type: String,
       required: true,
       trim: true,
@@ -19,28 +25,74 @@ const vendorSchema = new mongoose.Schema(
     phone: {
       type: String,
       required: true,
+      trim: true,
     },
 
     businessName: {
       type: String,
       required: true,
+      trim: true,
     },
 
-    businessAddress: {
-      street: String,
-      city: String,
-      state: String,
-      postalCode: String,
-      country: String,
+    businessType: {
+      type: String,
+      required: true,
+      trim: true,
     },
 
-    isActive: {
+    streetAddress: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    city: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    state: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    pinCode: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    nominateForAwards: {
+      type: Boolean,
+      default: false,
+    },
+
+    acceptMessages: {
       type: Boolean,
       default: true,
     },
+
+    // ⭐ NEW: Latitude & Longitude for vendor location tracking
+    latitude: {
+      type: Number,
+      required: false, // set true if must be provided
+    },
+
+    longitude: {
+      type: Number,
+      required: false, // set true if must be provided
+    },
+
+    status: {
+      type: String,
+      enum: ["PENDING", "ACCEPTED", "REJECTED"],
+      default: "PENDING",
+    },
   },
   {
-    timestamps: true, // adds createdAt and updatedAt
+    timestamps: true,
   }
 );
 
