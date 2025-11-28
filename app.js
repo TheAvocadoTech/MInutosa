@@ -27,7 +27,7 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // Health check
 app.get("/", (req, res) => {
-  res.send("You are connected");
+  res.send("You are connected to Minutos server");
 });
 
 // Authentication routes
