@@ -32,6 +32,9 @@ app.get("/", (req, res) => {
 
 // Authentication routes
 app.use("/api/auth", UserRoutes);
+//
+app.use("/api/orders", require("./routes/order.routes"));
+app.use("/api/payment", require("./routes/PaymentRoutes"));
 
 // Banner routes
 app.use("/api/ads", Banner);

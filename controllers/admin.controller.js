@@ -74,6 +74,20 @@ const loginAdmin = asyncHandler(async (req, res) => {
   });
 });
 
+const Order = require("../models/Order.model");
+
+exports.getDashboardOrders = async (req, res) => {
+  const stats = {
+    totalOrders: await Order.countDocuments(),
+    delivered: await Order.countDocuments({ status: "DELIVERED" }),
+    pending: await Order.countDocuments({ status: { $ne: "DELIVERED" } }),
+  };
+
+  const orders = await Order.find().sort({ createdAt: -1 }).limit(50);
+
+  res.json({ success: true, stats, orders });
+};
+
 module.exports = {
   loginAdmin,
 };

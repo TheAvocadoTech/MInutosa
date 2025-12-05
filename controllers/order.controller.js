@@ -1,70 +1,89 @@
-// // controllers/orderController.js
-// const Order = require('../models/Order');
-// const Cart = require('../models/Cart');
+const Order = require("../models/Order");
+const Product = require("../models/Product");
+const Vendor = require("../models/Vendor");
+const io = require("../socket").getIO();
 
-// // Place Order
-// exports.placeOrder = async (req, res) => {
-//     const { userId, shippingAddress, paymentMethod } = req.body;
+exports.createOrder = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { items, shippingAddress, selectedStore, paymentMethod } = req.body;
 
-//     if (!userId || !shippingAddress) return res.status(400).json({ message: 'userId and shippingAddress are required' });
+    const productIds = items.map((i) => i.product);
+    const productDocs = await Product.find({ _id: { $in: productIds } });
 
-//     try {
-//         const cart = await Cart.findOne({ user: userId }).populate('items.product');
+    let subtotal = 0;
+    const orderItems = items.map((i) => {
+      const p = productDocs.find((x) => x._id.equals(i.product));
+      subtotal += p.price * i.quantity;
 
-//         if (!cart || cart.items.length === 0) {
-//             return res.status(400).json({ message: 'Cart is empty' });
-//         }
+      return {
+        product: p._id,
+        quantity: i.quantity,
+        price: p.price,
+        name: p.name,
+        vendorId: p.vendorId,
+      };
+    });
 
-//         let totalAmount = 0;
+    const tax = subtotal * 0.05;
+    const deliveryFee = 20;
+    const totalAmount = subtotal + tax + deliveryFee;
 
-//         cart.items.forEach(item => {
-//             totalAmount += item.product.price * item.quantity;
-//         });
+    const vendor = await Vendor.findById(selectedStore.storeId);
 
-//         const newOrder = new Order({
-//             user: userId,
-//             items: cart.items.map(item => ({
-//                 product: item.product._id,
-//                 quantity: item.quantity
-//             })),
-//             totalAmount,
-//             shippingAddress,
-//             paymentMethod: paymentMethod || 'Cash on Delivery',
-//             paymentStatus: paymentMethod === 'Online' ? 'Paid' : 'Unpaid'
-//         });
+    const storeSnapshot = {
+      storeId: vendor._id,
+      name: vendor.businessName,
+      phone: vendor.phone,
+      streetAddress: vendor.streetAddress,
+      city: vendor.city,
+      state: vendor.state,
+      pinCode: vendor.pinCode,
+      latitude: vendor.latitude,
+      longitude: vendor.longitude,
+      autoSelected: selectedStore.autoSelected,
+    };
 
-//         await newOrder.save();
+    const order = await Order.create({
+      user: userId,
+      items: orderItems,
+      subtotal,
+      tax,
+      deliveryFee,
+      totalAmount,
+      shippingAddress,
+      selectedStore: storeSnapshot,
+      paymentMethod,
+      status: "PLACED",
+      events: [{ status: "PLACED", actor: "USER" }],
+    });
 
-//         // Clear cart after order
-//         cart.items = [];
-//         await cart.save();
+    io.emit("admin_new_order", order);
+    io.emit(`vendor_${vendor._id}`, { type: "NEW_ORDER", order });
 
-//         res.status(200).json({ message: 'Order placed successfully', order: newOrder });
-//     } catch (error) {
-//         res.status(500).json({ message: 'Server error', error });
-//     }
-// };
+    res.json({ success: true, orderId: order._id, order });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: "Error creating order" });
+  }
+};
 
-// // Get Orders for User
-// exports.getUserOrders = async (req, res) => {
-//     const userId = req.query.userId;
+exports.getOrder = async (req, res) => {
+  const order = await Order.findById(req.params.id)
+    .populate("items.product")
+    .populate("deliveryAgent.partnerId");
 
-//     if (!userId) return res.status(400).json({ message: 'userId is required' });
+  res.json({ success: true, order });
+};
 
-//     try {
-//         const orders = await Order.find({ user: userId }).populate('items.product').sort({ createdAt: -1 });
-//         res.status(200).json(orders);
-//     } catch (error) {
-//         res.status(500).json({ message: 'Server error', error });
-//     }
-// };
+exports.getMyOrders = async (req, res) => {
+  const orders = await Order.find({ user: req.user.id }).sort({
+    createdAt: -1,
+  });
+  res.json({ success: true, orders });
+};
 
-// // Get All Orders (Admin)
-// exports.getAllOrders = async (req, res) => {
-//     try {
-//         const orders = await Order.find().populate('user').populate('items.product').sort({ createdAt: -1 });
-//         res.status(200).json(orders);
-//     } catch (error) {
-//         res.status(500).json({ message: 'Server error', error });
-//     }
-// };
+exports.getAllOrders = async (req, res) => {
+  const orders = await Order.find().sort({ createdAt: -1 });
+  res.json({ success: true, orders });
+};

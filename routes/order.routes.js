@@ -1,13 +1,11 @@
-// // routes/order.js
-// const express = require('express');
-// const router = express.Router();
-// const {createOrder,getOrderById,getOrdersByUser,verifyPayment,getAllOrders}=  require('../controllers/order_razarpay.controlller')
+const router = require("express").Router();
+const orderCtrl = require("../controllers/order.controller");
+const auth = require("../middleware/auth");
 
-//   // Routes
-// router.post('/create', createOrder);
-// router.get('/user', getOrdersByUser);
-// router.post('/verify-payment', verifyPayment);
-// router.get('/:id', getOrderById);
-// router.get('/', getAllOrders);  
+router.post("/checkout", auth, orderCtrl.createOrder);
+router.get("/", auth, orderCtrl.getMyOrders);
+router.get("/:id", auth, orderCtrl.getOrder);
 
-// module.exports = router;
+router.get("/admin/all", orderCtrl.getAllOrders);
+
+module.exports = router;
