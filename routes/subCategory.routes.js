@@ -13,13 +13,12 @@ const {
   getAllCategoriesWithSubcategories,
   bulkUploadSubcategories,
 } = require("../controllers/subCategory.controller");
-
-const upload = multer({ dest: "uploads/" });
+const { protect, admin } = require("../middleware/auth.middleware");
 
 // ================= Routes ================= //
 
 // Create
-router.post("/", createSubcategory);
+router.post("/", protect, admin, createSubcategory);
 
 // Read (all, with optional query filters)
 router.get("/", getSubcategories);
@@ -31,15 +30,15 @@ router.get("/:id", getSubcategoryById);
 router.get("/category/:categoryId", getSubcategoriesByCategory);
 
 // Update
-router.put("/:id", updateSubcategory);
+router.put("/:id", protect, admin, updateSubcategory);
 
 // Delete
-router.delete("/:id", deleteSubcategory);
+router.delete("/:id", protect, admin, deleteSubcategory);
 //bulk upload
-router.post(
-  "/subcategories/bulk-upload",
-  upload.single("file"),
-  bulkUploadSubcategories
-);
+// router.post(
+//   "/subcategories/bulk-upload",
+//   upload.single("file"),
+//   bulkUploadSubcategories
+// );
 
 module.exports = router;

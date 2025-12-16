@@ -8,14 +8,15 @@ const app = express();
 // Import routes
 const connectDB = require("./config/db");
 const UserRoutes = require("./routes/Users.routes");
+const cookieParser = require("cookie-parser");
 const Banner = require("./routes/Banner.routes");
 const Category = require("./routes/category.routes");
 const Products = require("./routes/product.routes");
 const SubCategory = require("./routes/subCategory.routes");
-const Cart = require("./routes/cart.routes");
-const admin = require("./routes/admin.route");
-const vendor = require("./routes/vender.routes");
-const cookieParser = require("cookie-parser");
+// const Cart = require("./routes/cart.routes");
+// const admin = require("./routes/admin.route");
+// const vendor = require("./routes/vender.routes");
+// const cookieParser = require("cookie-parser");
 
 // Middleware
 app.use(helmet());
@@ -33,8 +34,8 @@ app.get("/", (req, res) => {
 // Authentication routes
 app.use("/api/auth", UserRoutes);
 //
-app.use("/api/orders", require("./routes/order.routes"));
-app.use("/api/payment", require("./routes/PaymentRoutes"));
+// app.use("/api/orders", require("./routes/order.routes"));
+// app.use("/api/payment", require("./routes/PaymentRoutes"));
 
 // Banner routes
 app.use("/api/ads", Banner);
@@ -43,16 +44,16 @@ app.use("/api/ads", Banner);
 app.use("/api/category", Category);
 app.use("/api/subcategory", SubCategory);
 
-// Product routes
+// // Product routes
 app.use("/api/product", Products);
-//Vendor Routes
-app.use("/api/vendor", vendor);
+// //Vendor Routes
+// // app.use("/api/vendor", vendor);
 
-// Cart routes
-app.use("/api/cart", Cart);
+// // Cart routes
+// app.use("/api/cart", Cart);
 
 // Admin routes
-app.use("/api/admin", admin);
+// app.use("/api/admin", admin);
 
 // Connect to MongoDB
 connectDB();

@@ -6,9 +6,9 @@ const userSchema = new mongoose.Schema(
   {
     phoneNumber: {
       type: String,
-      // required: true,
       unique: true,
       trim: true,
+      sparse: true, //
     },
 
     name: {
@@ -37,15 +37,15 @@ const userSchema = new mongoose.Schema(
       // required only for password-based accounts (admins/users). You can enforce on register route.
     },
 
-    role: {
-      type: String,
-      enum: ["user", "admin"],
-      default: "user",
-    },
-
     isAdmin: {
       type: Boolean,
+      required: true,
       default: false,
+    },
+    role: {
+      type: String,
+      enum: ["USER", "DELIVERY_AGENT"],
+      default: "USER",
     },
 
     otp: {
@@ -101,9 +101,13 @@ userSchema.methods.verifyOTP = function (inputOTP) {
   }
 
   const isValid = bcrypt.compareSync(inputOTP, this.otp.code);
+
   if (!isValid) {
     this.otp.attempts += 1;
+  } else {
+    this.otp = undefined; // ✅ clear OTP on success
   }
+
   return isValid;
 };
 

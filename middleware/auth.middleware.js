@@ -1,71 +1,79 @@
-// middleware/auth.js
 const jwt = require("jsonwebtoken");
 const User = require("../models/user.model");
 
-const authMiddleware = async (req, res, next) => {
+/**
+ * AUTHENTICATION
+ * - USER / ADMIN / DELIVERY_AGENT
+ */
+const protect = async (req, res, next) => {
   try {
-    const authHeader =
-      req.headers.authorization ||
-      req.cookies?.authorization ||
-      req.headers["x-access-token"];
+    let token;
 
-    if (!authHeader) {
-      return res.status(401).json({ message: "Unauthorized: Token missing" });
+    // Get token
+    if (req.headers.authorization?.startsWith("Bearer")) {
+      token = req.headers.authorization.split(" ")[1];
+    } else if (req.cookies?.jwt) {
+      token = req.cookies.jwt;
     }
 
-    // support "Bearer <token>" or token passed directly in header/cookie
-    const token = authHeader.startsWith("Bearer ")
-      ? authHeader.split(" ")[1]
-      : authHeader;
-
-    // verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "secretkey");
-
-    // support both payload shapes: { userId } or { id }
-    const userId = decoded.userId || decoded.id || decoded._id;
-    if (!userId) {
-      return res
-        .status(401)
-        .json({ message: "Unauthorized: Invalid token payload" });
+    if (!token) {
+      return res.status(401).json({ message: "Not authenticated" });
     }
 
-    // fetch user, exclude password + otp
-    const user = await User.findById(userId).select("-password -__v");
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    const user = await User.findById(decoded.userId).select("-password");
     if (!user) {
-      return res.status(401).json({ message: "Unauthorized: User not found" });
+      return res.status(401).json({ message: "User not found" });
     }
 
+    // Attach full user (includes role & isAdmin)
     req.user = user;
     next();
   } catch (error) {
-    // TokenExpiredError vs others
-    if (error.name === "TokenExpiredError") {
-      return res
-        .status(401)
-        .json({ message: "Token expired. Please login again." });
-    }
-    console.error("Auth Middleware Error:", error);
-    return res
-      .status(401)
-      .json({ message: "Unauthorized: Invalid or expired token" });
+    return res.status(401).json({ message: "Invalid or expired token" });
   }
 };
 
-// role-based admin check
-const requireAdmin = (req, res, next) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-    const role = (req.user.role || "").toString().toLowerCase();
-    if (role !== "admin" && role !== "superadmin") {
-      return res.status(403).json({ message: "Access Denied: Admin only" });
+/**
+ * ADMIN ONLY
+ */
+const admin = (req, res, next) => {
+  if (!req.user || (!req.user.isAdmin && req.user.role !== "ADMIN")) {
+    return res.status(403).json({
+      message: "Admin access only",
+    });
+  }
+  next();
+};
+
+/**
+ * DELIVERY AGENT ONLY
+ */
+const deliveryOnly = (req, res, next) => {
+  if (!req.user || req.user.role !== "DELIVERY_AGENT") {
+    return res.status(403).json({
+      message: "Delivery agent access only",
+    });
+  }
+  next();
+};
+
+/**
+ * GENERIC ROLE GUARD (OPTIONAL BUT CLEAN)
+ */
+const allowRoles = (...roles) => {
+  return (req, res, next) => {
+    if (!req.user || !roles.includes(req.user.role)) {
+      return res.status(403).json({ message: "Access denied" });
     }
     next();
-  } catch (err) {
-    console.error("requireAdmin error:", err);
-    return res.status(500).json({ message: "Server error" });
-  }
+  };
 };
 
-module.exports = { authMiddleware, requireAdmin };
+module.exports = {
+  protect,
+  admin,
+  deliveryOnly,
+  allowRoles,
+};

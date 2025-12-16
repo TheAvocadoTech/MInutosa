@@ -4,7 +4,6 @@ const Category = require("../models/Category.model");
 const csv = require("csv-parser");
 const fs = require("fs");
 const path = require("path");
-const multer = require("multer");
 
 // ================= Helper Functions ================= //
 

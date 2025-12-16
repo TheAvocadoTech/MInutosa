@@ -1,14 +1,14 @@
-const express = require("express");
-const { loginAdmin } = require("../controllers/admin.controller");
+// const express = require("express");
+// const { loginAdmin } = require("../controllers/admin.controller");
 
-const router = express.Router();
+// const router = express.Router();
 
-router.post("/adminLogin", loginAdmin);
+// router.post("/adminLogin", loginAdmin);
 
-const adminCtrl = require("../controllers/adminOrder.controller");
+// const adminCtrl = require("../controllers/adminOrder.controller");
 
-router.get("/dashboard", adminCtrl.getDashboardOrders);
+// router.get("/dashboard", adminCtrl.getDashboardOrders);
 
-module.exports = router;
+// module.exports = router;
 
-module.exports = router;
+// module.exports = router;
