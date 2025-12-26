@@ -88,7 +88,7 @@ const vendorSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: ["PENDING", "ACCEPTED", "REJECTED"],
-      default: "PENDING",
+      default: "ACCEPTED",
     },
   },
   {

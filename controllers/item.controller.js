@@ -6,6 +6,14 @@ const SubCategory = require("../models/subCategory.model");
 // ✅ Create Product
 const createProduct = async (req, res) => {
   try {
+    // ✅ Check if req.body exists
+    if (!req.body || Object.keys(req.body).length === 0) {
+      return res.status(400).json({
+        message:
+          "Request body is empty or invalid. Make sure you're sending JSON data.",
+      });
+    }
+
     const productData = req.body;
 
     // Validate required fields
@@ -22,8 +30,12 @@ const createProduct = async (req, res) => {
     }
 
     // ✅ Validate & fetch categories (array support)
+    const categoryIds = Array.isArray(productData.category)
+      ? productData.category
+      : [productData.category];
+
     const categories = await Category.find({
-      _id: { $in: productData.category },
+      _id: { $in: categoryIds },
     });
 
     if (!categories.length) {
@@ -31,8 +43,12 @@ const createProduct = async (req, res) => {
     }
 
     // ✅ Validate & fetch subcategories (array support)
+    const subCategoryIds = Array.isArray(productData.subCategory)
+      ? productData.subCategory
+      : [productData.subCategory];
+
     const subCategories = await SubCategory.find({
-      _id: { $in: productData.subCategory },
+      _id: { $in: subCategoryIds },
     });
 
     if (!subCategories.length) {
@@ -59,7 +75,6 @@ const createProduct = async (req, res) => {
     });
   }
 };
-
 // ✅ Get All Products
 const getAllProducts = async (req, res) => {
   try {

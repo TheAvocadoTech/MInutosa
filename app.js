@@ -14,8 +14,8 @@ const Category = require("./routes/category.routes");
 const Products = require("./routes/product.routes");
 const SubCategory = require("./routes/subCategory.routes");
 // const Cart = require("./routes/cart.routes");
-// const admin = require("./routes/admin.route");
-// const vendor = require("./routes/vender.routes");
+
+const vendor = require("./routes/vender.routes");
 // const cookieParser = require("cookie-parser");
 
 // Middleware
@@ -47,7 +47,7 @@ app.use("/api/subcategory", SubCategory);
 // // Product routes
 app.use("/api/product", Products);
 // //Vendor Routes
-// // app.use("/api/vendor", vendor);
+app.use("/api/vendor", vendor);
 
 // // Cart routes
 // app.use("/api/cart", Cart);
@@ -62,84 +62,63 @@ connectDB();
 const listRoutes = (app) => {
   console.log("\n📂 ========== AVAILABLE ROUTES ==========\n");
 
-  // Check if router exists
   if (!app._router || !app._router.stack) {
-    console.log("⚠️  No routes found (router not initialized)\n");
+    console.log("⚠️ No routes found\n");
     return;
   }
 
   const routes = [];
 
-  // Function to extract base path from regex
-  const getPathFromRegex = (regexp) => {
-    const regexpStr = regexp.toString();
-
-    // Match patterns like /^\/api\/auth\/?(?=\/|$)/i
-    let match = regexpStr.match(/^\/\^\\\/(.+?)\\/);
-    if (match) {
-      return "/" + match[1].replace(/\\\//g, "/");
+  const extractPath = (layer) => {
+    if (layer.regexp && layer.regexp.source) {
+      return layer.regexp.source
+        .replace("^\\/", "/")
+        .replace("\\/?(?=\\/|$)", "")
+        .replace(/\\\//g, "/")
+        .replace(/(\(\?:\)\?)/g, "")
+        .replace(/\$$/, "");
     }
-
-    // Match simpler patterns
-    match = regexpStr.match(/^\/\^(.+?)\$/);
-    if (match) {
-      return match[1].replace(/\\\//g, "/");
-    }
-
     return "";
   };
 
-  app._router.stack.forEach((middleware) => {
-    if (middleware.route) {
-      // Direct routes on the app
-      const methods = Object.keys(middleware.route.methods)
+  app._router.stack.forEach((layer) => {
+    // Direct routes
+    if (layer.route) {
+      const methods = Object.keys(layer.route.methods)
         .map((m) => m.toUpperCase())
         .join(", ");
       routes.push({
         method: methods,
-        path: middleware.route.path,
+        path: layer.route.path,
       });
-    } else if (
-      middleware.name === "router" &&
-      middleware.handle &&
-      middleware.handle.stack
-    ) {
-      // Get the base path for this router
-      const basePath = getPathFromRegex(middleware.regexp);
+    }
 
-      // Iterate through all routes in this router
-      middleware.handle.stack.forEach((handler) => {
+    // Router middleware
+    if (layer.name === "router" && layer.handle?.stack) {
+      const basePath = extractPath(layer);
+
+      layer.handle.stack.forEach((handler) => {
         if (handler.route) {
           const methods = Object.keys(handler.route.methods)
             .map((m) => m.toUpperCase())
             .join(", ");
-
-          const routePath = handler.route.path;
-          const fullPath = basePath + routePath;
-
           routes.push({
             method: methods,
-            path: fullPath,
+            path: `${basePath}${handler.route.path}`,
           });
         }
       });
     }
   });
 
-  // Sort routes by path for better readability
   routes.sort((a, b) => a.path.localeCompare(b.path));
 
-  // Display routes in a formatted table
-  if (routes.length === 0) {
-    console.log("⚠️  No routes found");
-  } else {
-    routes.forEach((route, index) => {
-      console.log(`${index + 1}. ${route.method.padEnd(7)} ${route.path}`);
-    });
-    console.log(`\n✅ Total Routes: ${routes.length}\n`);
-  }
+  routes.forEach((r, i) => {
+    console.log(`${i + 1}. ${r.method.padEnd(8)} ${r.path}`);
+  });
 
-  console.log("========================================\n");
+  console.log(`\n✅ Total Routes: ${routes.length}`);
+  console.log("\n========================================\n");
 };
 
 // Start server with Azure-safe PORT handling

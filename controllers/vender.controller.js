@@ -1,45 +1,262 @@
-const Order = require("../models/Order");
-const io = require("../socket").getIO();
+const Vendor = require("../models/Vendor.model");
 
-exports.vendorAccept = async (req, res) => {
-  const { orderId } = req.params;
+/**
+ * =====================================================
+ * CREATE VENDOR
+ * =====================================================
+ * @route   POST /api/vendor
+ * @access  Public / Admin
+ */
+exports.createVendor = async (req, res) => {
+  try {
+    const {
+      firstName,
+      lastName,
+      email,
+      phone,
+      businessName,
+      businessType,
+      streetAddress,
+      city,
+      state,
+      pinCode,
+      nominateForAwards,
+      acceptMessages,
+      latitude,
+      longitude,
+    } = req.body;
 
-  const order = await Order.findByIdAndUpdate(
-    orderId,
-    {
-      status: "VENDOR_ACCEPTED",
-      vendorAcceptedAt: new Date(),
-      $push: {
-        events: {
-          status: "VENDOR_ACCEPTED",
-          actor: "VENDOR",
-          actorId: req.vendor.id,
-        },
-      },
-    },
-    { new: true }
-  );
+    // Check existing vendor
+    const existingVendor = await Vendor.findOne({ email });
+    if (existingVendor) {
+      return res.status(400).json({
+        success: false,
+        message: "Vendor already exists with this email",
+      });
+    }
 
-  io.to(orderId).emit("statusUpdate", { status: "VENDOR_ACCEPTED" });
+    const vendor = await Vendor.create({
+      firstName,
+      lastName,
+      email,
+      phone,
+      businessName,
+      businessType,
+      streetAddress,
+      city,
+      state,
+      pinCode,
+      nominateForAwards,
+      acceptMessages,
+      latitude,
+      longitude,
+    });
 
-  res.json({ success: true, order });
+    res.status(201).json({
+      success: true,
+      message: "Vendor created successfully",
+      vendor,
+    });
+  } catch (error) {
+    console.error("Create Vendor Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while creating vendor",
+    });
+  }
 };
 
-exports.vendorReady = async (req, res) => {
-  const { orderId } = req.params;
+/**
+ * =====================================================
+ * GET SINGLE VENDOR DETAILS
+ * =====================================================
+ * @route   GET /api/vendor/:vendorId
+ * @access  Private (Vendor/Admin)
+ */
+exports.getVendorDetails = async (req, res) => {
+  try {
+    const { vendorId } = req.params;
 
-  const order = await Order.findByIdAndUpdate(
-    orderId,
-    {
-      status: "READY_FOR_PICKUP",
-      readyForPickupAt: new Date(),
-      $push: { events: { status: "READY_FOR_PICKUP", actor: "VENDOR" } },
-    },
-    { new: true }
-  );
+    const vendor = await Vendor.findById(vendorId);
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: "Vendor not found",
+      });
+    }
 
-  io.emit("delivery_new_order", order);
-  io.to(orderId).emit("statusUpdate", { status: "READY_FOR_PICKUP" });
+    res.json({
+      success: true,
+      vendor,
+    });
+  } catch (error) {
+    console.error("Get Vendor Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching vendor",
+    });
+  }
+};
 
-  res.json({ success: true, order });
+/**
+ * =====================================================
+ * GET LOGGED-IN VENDOR PROFILE
+ * =====================================================
+ * @route   GET /api/vendor/profile/me
+ * @access  Private (Vendor)
+ */
+exports.getMyVendorProfile = async (req, res) => {
+  try {
+    const vendorId = req.vendor.id;
+
+    const vendor = await Vendor.findById(vendorId);
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: "Vendor not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      vendor,
+    });
+  } catch (error) {
+    console.error("Get My Vendor Profile Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+
+/**
+ * =====================================================
+ * UPDATE VENDOR DETAILS
+ * =====================================================
+ * @route   PUT /api/vendor/:vendorId
+ * @access  Private (Vendor/Admin)
+ */
+exports.updateVendor = async (req, res) => {
+  try {
+    const { vendorId } = req.params;
+
+    const vendor = await Vendor.findByIdAndUpdate(vendorId, req.body, {
+      new: true,
+      runValidators: true,
+    });
+
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: "Vendor not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Vendor updated successfully",
+      vendor,
+    });
+  } catch (error) {
+    console.error("Update Vendor Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while updating vendor",
+    });
+  }
+};
+
+/**
+ * =====================================================
+ * GET ALL VENDORS
+ * =====================================================
+ * @route   GET /api/vendor
+ * @access  Admin
+ */
+exports.getAllVendors = async (req, res) => {
+  try {
+    const vendors = await Vendor.find().sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      count: vendors.length,
+      vendors,
+    });
+  } catch (error) {
+    console.error("Get All Vendors Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+
+/**
+ * =====================================================
+ * UPDATE VENDOR STATUS (ACCEPT / REJECT)
+ * =====================================================
+ * @route   PATCH /api/vendor/:vendorId/status
+ * @access  Admin
+ */
+exports.updateVendorStatus = async (req, res) => {
+  try {
+    const { vendorId } = req.params;
+    const { status } = req.body;
+
+    if (!["ACCEPTED", "REJECTED"].includes(status)) {
+      return res.status(400).json({ message: "Invalid status" });
+    }
+
+    const vendor = await Vendor.findByIdAndUpdate(
+      vendorId,
+      { status },
+      { new: true }
+    );
+
+    if (!vendor) {
+      return res.status(404).json({ message: "Vendor not found" });
+    }
+
+    res.json({
+      success: true,
+      message: `Vendor ${status.toLowerCase()} successfully`,
+      vendor,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+/**
+ * =====================================================
+ * DELETE VENDOR
+ * =====================================================
+ * @route   DELETE /api/vendor/:vendorId
+ * @access  Admin
+ */
+exports.deleteVendor = async (req, res) => {
+  try {
+    const { vendorId } = req.params;
+
+    const vendor = await Vendor.findByIdAndDelete(vendorId);
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: "Vendor not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Vendor deleted successfully",
+    });
+  } catch (error) {
+    console.error("Delete Vendor Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
 };
