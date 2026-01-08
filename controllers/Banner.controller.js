@@ -14,59 +14,46 @@ const createOrUpdateBanner = async (req, res) => {
 
     let updateData = {};
 
-    // ✅ Upload and set Home Banner 1
+    const uploadImage = async (image, folder) => {
+      const result = await cloudinary.uploader.upload(image, {
+        folder,
+        resource_type: "image",
+        type: "upload", // ✅ FORCE PUBLIC
+      });
+      return result.secure_url;
+    };
+
     if (homeBanner1) {
-      const result = await cloudinary.uploader.upload(homeBanner1, {
-        folder: "Banners/Home",
-      });
-      updateData.homeBanner1 = result.secure_url;
+      updateData.homeBanner1 = await uploadImage(homeBanner1, "Banners/Home");
     }
 
-    // ✅ Upload and set Advertise Banners (multiple images)
-    if (advertiseBanners && advertiseBanners.length > 0) {
-      let uploadedAds = [];
-      for (let ad of advertiseBanners) {
-        const result = await cloudinary.uploader.upload(ad, {
-          folder: "Banners/Advertise",
-        });
-        uploadedAds.push(result.secure_url);
-      }
-      updateData.advertiseBanners = uploadedAds;
-    }
-
-    // ✅ Upload Home Banner 2
     if (homeBanner2) {
-      const result = await cloudinary.uploader.upload(homeBanner2, {
-        folder: "Banners/Home",
-      });
-      updateData.homeBanner2 = result.secure_url;
+      updateData.homeBanner2 = await uploadImage(homeBanner2, "Banners/Home");
     }
 
-    // ✅ Upload Home Banner 3
     if (homeBanner3) {
-      const result = await cloudinary.uploader.upload(homeBanner3, {
-        folder: "Banners/Home",
-      });
-      updateData.homeBanner3 = result.secure_url;
+      updateData.homeBanner3 = await uploadImage(homeBanner3, "Banners/Home");
     }
 
-    // ✅ Upload Home Banner 4
     if (homeBanner4) {
-      const result = await cloudinary.uploader.upload(homeBanner4, {
-        folder: "Banners/Home",
-      });
-      updateData.homeBanner4 = result.secure_url;
+      updateData.homeBanner4 = await uploadImage(homeBanner4, "Banners/Home");
     }
 
-    // ✅ Ensure only 1 Banner document exists (update or create)
+    if (advertiseBanners && advertiseBanners.length > 0) {
+      updateData.advertiseBanners = [];
+      for (const ad of advertiseBanners) {
+        const url = await uploadImage(ad, "Banners/Advertise");
+        updateData.advertiseBanners.push(url);
+      }
+    }
+
     let banner = await BannerModel.findOne();
     if (banner) {
       banner = await BannerModel.findByIdAndUpdate(banner._id, updateData, {
         new: true,
       });
     } else {
-      banner = new BannerModel(updateData);
-      await banner.save();
+      banner = await BannerModel.create(updateData);
     }
 
     res.status(201).json({
@@ -76,9 +63,11 @@ const createOrUpdateBanner = async (req, res) => {
     });
   } catch (error) {
     console.error("Error in createOrUpdateBanner:", error);
-    res
-      .status(500)
-      .json({ success: false, message: "Server error", error: error.message });
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message,
+    });
   }
 };
 
