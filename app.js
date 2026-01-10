@@ -13,6 +13,7 @@ const Banner = require("./routes/Banner.routes");
 const Category = require("./routes/category.routes");
 const Products = require("./routes/product.routes");
 const SubCategory = require("./routes/subCategory.routes");
+const Cart = require("./routes/cart.routes");
 // const Cart = require("./routes/cart.routes");
 
 const vendor = require("./routes/vender.routes");
@@ -49,8 +50,8 @@ app.use("/api/product", Products);
 // //Vendor Routes
 app.use("/api/vendor", vendor);
 
-// // Cart routes
-// app.use("/api/cart", Cart);
+// Cart routes
+app.use("/api/cart", Cart);
 
 // Admin routes
 // app.use("/api/admin", admin);

@@ -1,22 +1,34 @@
+// routes/cart.routes.js
+
 const express = require("express");
 const {
-  userCart: getUserCart,
+  userCart,
   addToCart,
   updateQuantity,
   removeFromCart,
 } = require("../controllers/cart.controller");
+
 const router = express.Router();
 
-// ✅ Get user cart
-router.get("/", getUserCart);
+// ================= CART ROUTES =================
 
-// ✅ Add product to cart
+// Get user cart
+// Supports:
+// GET /api/cart?userId=xxx
+// GET /api/cart/xxx
+router.get("/", userCart);
+router.get("/:userId", userCart);
+
+// Add product to cart
+// POST /api/cart/add
 router.post("/add", addToCart);
 
-// ✅ Update quantity
+// Update quantity
+// PUT /api/cart/update
 router.put("/update", updateQuantity);
 
-// ✅ Remove from cart
-// Change this line in your routes file
-router.post("/remove", removeFromCart); // Changed from DELETE to POST
+// Remove product from cart
+// POST /api/cart/remove
+router.post("/remove", removeFromCart);
+
 module.exports = router;
