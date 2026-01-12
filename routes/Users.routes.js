@@ -20,7 +20,7 @@ router.post("/send-otp", sendOtp);
 // Verify OTP (login)
 router.post("/verify-otp", verifyOtp);
 
-// Resend OTP
+// //Resend OTP
 // router.post("/resend-otp", resendOtp);
 
 // Logout (both user & admin)
