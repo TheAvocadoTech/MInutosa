@@ -1,49 +1,59 @@
 const express = require("express");
+const router = express.Router();
+
 const {
+  registerVendor,
+  loginVendor,
   createVendor,
   getVendorDetails,
-  //   getMyVendorProfile,
-  //   updateVendor,
+  getMyVendorProfile,
+  updateVendor,
   getAllVendors,
   updateVendorStatus,
   deleteVendor,
 } = require("../controllers/vender.controller");
-const { protect, admin } = require("../middleware/auth.middleware");
 
-// const vendorAuth = require("../middleware/auth.middleware");
+const {
+  protect,
+  admin,
+  protectVendor,
+  acceptedVendorOnly,
+} = require("../middleware/auth.middleware");
 
-const router = express.Router();
+/* ================= AUTH ================= */
 
-/* ================= VENDOR ORDER ACTIONS ================= */
+// Register a new vendor
+router.post("/register", registerVendor);
 
-// Accept order
+// Login vendor → returns JWT
+router.post("/login", loginVendor);
 
-/* ================= VENDOR PROFILE ================= */
+/* ================= VENDOR PROFILE (self) ================= */
 
-// Get logged-in vendor profile
-// router.get("/profile/me", getMyVendorProfile);
+// Get logged-in vendor's own profile
+router.get("/profile/me", protectVendor, getMyVendorProfile);
 
-// Update logged-in vendor profile
-// router.put("/profile/me", updateVendor);
+// Update logged-in vendor's own profile
+router.put("/profile/me", protectVendor, acceptedVendorOnly, updateVendor);
 
-/* ================= VENDOR MANAGEMENT ================= */
+/* ================= VENDOR MANAGEMENT (admin) ================= */
 
-// Create vendor
-router.post("/", createVendor);
+// Create vendor manually (admin)
+router.post("/", protect, admin, createVendor);
 
-// Get all vendors
-router.get("/", getAllVendors);
+// Get all vendors (admin)
+router.get("/", protect, admin, getAllVendors);
 
-// // Get vendor by ID
-// router.get("/:vendorId", getVendorDetails);
+// Get vendor by ID (admin)
+router.get("/:vendorId", protect, admin, getVendorDetails);
 
-// Update vendor by ID
-// router.put("/:vendorId", vendorAuth, updateVendor);
+// Update vendor by ID (admin)
+router.put("/:vendorId", protect, admin, updateVendor);
 
-// Delete vendor
-router.delete("/:vendorId", deleteVendor);
+// Delete vendor (admin)
+router.delete("/:vendorId", protect, admin, deleteVendor);
 
-/* ================= VENDOR STATUS (ADMIN / SUPER) ================= */
+/* ================= VENDOR STATUS (admin) ================= */
 
 // Accept / Reject vendor
 router.patch("/:vendorId/status", protect, admin, updateVendorStatus);

@@ -2,65 +2,78 @@ const mongoose = require("mongoose");
 
 const vendorSchema = new mongoose.Schema(
   {
-    firstName: {
+    // ── Required at registration ──────────────────────────────────────────────
+    storeName: {
       type: String,
-      required: true,
-      trim: true,
-    },
-
-    lastName: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-
-    email: {
-      type: String,
-      required: true,
+      required: [true, "Store name is required"],
       unique: true,
       lowercase: true,
       trim: true,
     },
 
+    email: {
+      type: String,
+      required: [true, "Email is required"],
+      unique: true,
+      lowercase: true,
+      trim: true,
+    },
+
+    password: {
+      type: String,
+      required: [true, "Password is required"],
+      select: false, // never returned in queries by default
+    },
+
+    confirmPassword: {
+      type: String,
+      required: [true, "Confirm password is required"],
+      select: false,
+    },
+
+    // ── Filled in later (profile completion / admin) ──────────────────────────
+    firstName: {
+      type: String,
+      trim: true,
+    },
+
+    lastName: {
+      type: String,
+      trim: true,
+    },
+
     phone: {
       type: String,
-      required: true,
       trim: true,
     },
 
     businessName: {
       type: String,
-      required: true,
       trim: true,
     },
 
     businessType: {
       type: String,
-      required: true,
       trim: true,
     },
 
     streetAddress: {
       type: String,
-      required: true,
       trim: true,
     },
 
     city: {
       type: String,
-      required: true,
       trim: true,
     },
 
     state: {
       type: String,
-      required: true,
       trim: true,
     },
 
     pinCode: {
       type: String,
-      required: true,
       trim: true,
     },
 
@@ -74,26 +87,21 @@ const vendorSchema = new mongoose.Schema(
       default: true,
     },
 
-    // ⭐ NEW: Latitude & Longitude for vendor location tracking
     latitude: {
       type: Number,
-      required: false, // set true if must be provided
     },
 
     longitude: {
       type: Number,
-      required: false, // set true if must be provided
     },
 
     status: {
       type: String,
       enum: ["PENDING", "ACCEPTED", "REJECTED"],
-      default: "ACCEPTED",
+      default: "PENDING",
     },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true },
 );
 
 module.exports = mongoose.model("Vendor", vendorSchema);

@@ -44,7 +44,7 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["USER", "DELIVERY_AGENT"],
+      enum: ["USER", "DELIVERY_AGENT", "ADMIN"],
       default: "USER",
     },
 
@@ -59,7 +59,7 @@ const userSchema = new mongoose.Schema(
       default: false,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // Pre-save: hash password if modified
