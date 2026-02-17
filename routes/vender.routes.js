@@ -56,7 +56,8 @@ router.put("/profile/me", protectVendor, acceptedVendorOnly, updateVendor);
 /* ================= VENDOR MANAGEMENT (admin) ================= */
 
 router.post("/", protect, admin, createVendor);
-router.get("/", protect, admin, getAllVendors);
+router.get("/", getAllVendors);
+// router.get("/", protect, admin, getAllVendors);
 router.get("/:vendorId", protect, admin, getVendorDetails);
 router.put("/:vendorId", protect, admin, updateVendor);
 router.delete("/:vendorId", protect, admin, deleteVendor);
