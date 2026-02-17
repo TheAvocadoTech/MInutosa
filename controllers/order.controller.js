@@ -70,7 +70,7 @@ exports.getMyOrders = async (req, res) => {
 // ✅ FIXED: GET VENDOR ORDERS — populates user + full product (including images array)
 exports.getVendorOrders = async (req, res) => {
   try {
-    console.log("Logged in vendor ID:", req.vendor._id);
+    // console.log("Logged in vendor ID:", req.vendor._id);
 
     const orders = await Order.find({ vendor: req.vendor._id })
       // ✅ populate all user fields needed for display
