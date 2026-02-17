@@ -30,7 +30,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
 const Vendor = require("../models/Vendor.model");
-const { sendOtpEmail } = require("../utils/sendEmail");
+const { sendOtpEmail } = require("../utils/sendEmail.util");
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 const OTP_EXPIRY_MIN = 10;
