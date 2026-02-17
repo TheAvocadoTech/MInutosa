@@ -1,79 +1,201 @@
-const Vendor = require("../models/Vendor.model");
+// controllers/vender.controller.js
+// ─────────────────────────────────────────────────────────────────────────────
+//  SINGLE LOGIN PAGE FLOW:
+//  1. POST /vendor/check-email   → is this email in DB?
+//  2. POST /vendor/send-otp      → send OTP to that email
+//  3. POST /vendor/verify-otp    → verify OTP
+//       → { needsPassword: true,  setupToken }  (first time)
+//       → { needsPassword: false, token, vendor } (returning)
+//  4. POST /vendor/set-password  → create password (first time, uses setupToken)
+//       → { token, vendor }  → redirect to dashboard
+//
+//  NORMAL LOGIN (returning vendors who already have a password):
+//  POST /vendor/login  → email + password → token
+//
+//  ADMIN:
+//  POST   /vendor/             createVendor
+//  GET    /vendor/             getAllVendors
+//  GET    /vendor/:vendorId    getVendorDetails
+//  PUT    /vendor/:vendorId    updateVendor
+//  DELETE /vendor/:vendorId    deleteVendor
+//  PATCH  /vendor/:vendorId/status  updateVendorStatus
+//
+//  VENDOR SELF:
+//  GET /vendor/profile/me   getMyVendorProfile
+//  PUT /vendor/profile/me   updateVendor
+// ─────────────────────────────────────────────────────────────────────────────
+
+const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
-// ─── Helper: generate JWT ────────────────────────────────────────────────────
-const generateToken = (id) =>
+const Vendor = require("../models/Vendor.model");
+const { sendOtpEmail } = require("../utils/sendEmail");
+
+// ─── helpers ──────────────────────────────────────────────────────────────────
+const OTP_EXPIRY_MIN = 10;
+const OTP_LENGTH = 6;
+
+const generateOtp = () =>
+  crypto.randomInt(10 ** (OTP_LENGTH - 1), 10 ** OTP_LENGTH).toString();
+
+const generateToken = (id, expiresIn) =>
   jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN || "7d",
+    expiresIn: expiresIn || process.env.JWT_EXPIRES_IN || "7d",
   });
 
-/**
- * =====================================================
- * REGISTER VENDOR
- * =====================================================
- * @route   POST /api/vendor/register
- * @access  Public
- * Registers a new vendor using storeName, email,
- * password and confirmPassword.
- */
-exports.registerVendor = async (req, res) => {
+// ═════════════════════════════════════════════════════════════════════════════
+// 1. CHECK EMAIL — does this vendor exist in DB?
+// POST /api/vendor/check-email
+// body: { email }
+// ═════════════════════════════════════════════════════════════════════════════
+exports.checkEmail = async (req, res) => {
   try {
-    const { storeName, email, password, confirmPassword } = req.body;
+    const { email } = req.body;
+    if (!email) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Email is required" });
+    }
 
-    // ── All fields required ───────────────────────────────────────────────────
-    if (!storeName || !email || !password || !confirmPassword) {
-      return res.status(400).json({
+    const vendor = await Vendor.findOne({ email: email.toLowerCase().trim() });
+
+    if (!vendor) {
+      return res.status(404).json({
         success: false,
         message:
-          "Store name, email, password and confirm password are required",
+          "No vendor account found with this email. Please contact admin.",
       });
     }
 
-    // ── Passwords match ───────────────────────────────────────────────────────
-    if (password !== confirmPassword) {
-      return res.status(400).json({
+    res.json({ success: true, exists: true });
+  } catch (err) {
+    console.error("checkEmail Error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 2. SEND OTP — vendor confirmed in DB, now send OTP
+// POST /api/vendor/send-otp
+// body: { email }
+// ═════════════════════════════════════════════════════════════════════════════
+exports.sendOtp = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Email is required" });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const vendor = await Vendor.findOne({ email: normalizedEmail });
+
+    if (!vendor) {
+      return res.status(404).json({
         success: false,
-        message: "Password and confirm password do not match",
+        message: "No vendor account found with this email.",
       });
     }
 
-    // ── Duplicate email ───────────────────────────────────────────────────────
-    const emailExists = await Vendor.findOne({ email });
-    if (emailExists) {
-      return res.status(400).json({
-        success: false,
-        message: "A vendor with this email already exists",
-      });
-    }
+    const otp = generateOtp();
+    const otpExpires = new Date(Date.now() + OTP_EXPIRY_MIN * 60 * 1000);
 
-    // ── Duplicate storeName ───────────────────────────────────────────────────
-    const storeExists = await Vendor.findOne({ storeName });
-    if (storeExists) {
-      return res.status(400).json({
-        success: false,
-        message: "This store name is already taken",
-      });
-    }
+    vendor.otp = otp;
+    vendor.otpExpires = otpExpires;
+    vendor.isEmailVerified = false;
+    await vendor.save();
 
-    // ── Hash password ─────────────────────────────────────────────────────────
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-    const hashedConfirm = await bcrypt.hash(confirmPassword, salt);
+    await sendOtpEmail(normalizedEmail, otp, OTP_EXPIRY_MIN);
 
-    // ── Create vendor ─────────────────────────────────────────────────────────
-    const vendor = await Vendor.create({
-      storeName,
-      email,
-      password: hashedPassword,
-      confirmPassword: hashedConfirm,
+    res.json({
+      success: true,
+      message: `A ${OTP_LENGTH}-digit verification code was sent to ${normalizedEmail}`,
     });
+  } catch (err) {
+    console.error("sendOtp Error:", err);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to send verification code" });
+  }
+};
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 3. VERIFY OTP
+// POST /api/vendor/verify-otp
+// body: { email, otp }
+//
+// Two possible responses:
+//   A) needsPassword: true  → first-time vendor, must create password
+//      { success, needsPassword: true, setupToken }
+//   B) needsPassword: false → returning vendor, logged in directly
+//      { success, needsPassword: false, token, vendor }
+// ═════════════════════════════════════════════════════════════════════════════
+exports.verifyOtp = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    if (!email || !otp) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Email and OTP are required" });
+    }
+
+    const vendor = await Vendor.findOne({
+      email: email.toLowerCase().trim(),
+    }).select("+otp +otpExpires +password");
+
+    if (!vendor) {
+      return res.status(400).json({
+        success: false,
+        message: "No pending verification for this email",
+      });
+    }
+    if (!vendor.otp || !vendor.otpExpires) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Please request a new OTP" });
+    }
+    if (new Date() > vendor.otpExpires) {
+      return res.status(400).json({
+        success: false,
+        message: "OTP has expired. Please request a new one.",
+      });
+    }
+    if (vendor.otp !== otp.trim()) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid OTP. Please try again." });
+    }
+
+    // Clear OTP fields
+    vendor.isEmailVerified = true;
+    vendor.otp = undefined;
+    vendor.otpExpires = undefined;
+    await vendor.save();
+
+    // ── First-time: no password yet ───────────────────────────────────────────
+    if (!vendor.password) {
+      const setupToken = generateToken(vendor._id, "15m");
+      return res.json({
+        success: true,
+        needsPassword: true,
+        setupToken,
+      });
+    }
+
+    // ── Returning vendor: log in directly ─────────────────────────────────────
+    if (vendor.status === "REJECTED") {
+      return res.status(403).json({
+        success: false,
+        message: "Your account has been rejected. Please contact support.",
+      });
+    }
 
     const token = generateToken(vendor._id);
-
-    res.status(201).json({
+    return res.json({
       success: true,
-      message: "Vendor registered successfully",
+      needsPassword: false,
       token,
       vendor: {
         _id: vendor._id,
@@ -82,54 +204,145 @@ exports.registerVendor = async (req, res) => {
         status: vendor.status,
       },
     });
-  } catch (error) {
-    console.error("Register Vendor Error:", error);
+  } catch (err) {
+    console.error("verifyOtp Error:", err);
+    res.status(500).json({ success: false, message: "Verification failed" });
+  }
+};
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 4. SET PASSWORD — first-time only, requires setupToken in header
+// POST /api/vendor/set-password
+// headers: Authorization: Bearer <setupToken>
+// body:    { password, confirmPassword }
+// → logs vendor in and returns full JWT + vendor obj
+// ═════════════════════════════════════════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════════════════════
+// 4. SET PASSWORD — first-time only (AUTO LOGIN AFTER SET)
+// POST /api/vendor/set-password
+// headers: Authorization: Bearer <setupToken>
+// body:    { password, confirmPassword }
+// ═════════════════════════════════════════════════════════════════════════════
+exports.setPassword = async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization || "";
+    const setupToken = authHeader.startsWith("Bearer ")
+      ? authHeader.slice(7)
+      : null;
+
+    if (!setupToken) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Setup token required" });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(setupToken, process.env.JWT_SECRET);
+    } catch {
+      return res
+        .status(401)
+        .json({ success: false, message: "Setup token is invalid or expired" });
+    }
+
+    const vendor = await Vendor.findById(decoded.id).select("+password");
+
+    if (!vendor || !vendor.isEmailVerified) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Email not verified" });
+    }
+
+    if (vendor.password) {
+      return res.status(400).json({
+        success: false,
+        message: "Password already set. Please sign in normally.",
+      });
+    }
+
+    const { password, confirmPassword } = req.body;
+
+    if (!password || !confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Password and confirm password are required",
+      });
+    }
+
+    if (password !== confirmPassword) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Passwords do not match" });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 6 characters",
+      });
+    }
+
+    // 🔐 Hash password
+    const salt = await bcrypt.genSalt(10);
+    vendor.password = await bcrypt.hash(password, salt);
+
+    await vendor.save();
+
+    // ✅ AUTO LOGIN AFTER PASSWORD CREATION
+    const token = generateToken(vendor._id);
+
+    res.json({
+      success: true,
+      message: "Password created successfully",
+      token,
+      vendor: {
+        _id: vendor._id,
+        storeName: vendor.storeName,
+        email: vendor.email,
+        status: vendor.status,
+      },
+    });
+  } catch (err) {
+    console.error("setPassword Error:", err);
     res.status(500).json({
       success: false,
-      message: "Server error while registering vendor",
+      message: "Failed to set password",
     });
   }
 };
 
-/**
- * =====================================================
- * LOGIN VENDOR
- * =====================================================
- * @route   POST /api/vendor/login
- * @access  Public
- * Authenticates a vendor with email + password
- * and returns a JWT token.
- */
+// ═════════════════════════════════════════════════════════════════════════════
+// LOGIN — standard email + password (returning vendors)
+// POST /api/vendor/login
+// body: { email, password }
+// ═════════════════════════════════════════════════════════════════════════════
 exports.loginVendor = async (req, res) => {
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "Please provide email and password",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "Please provide email and password" });
     }
 
-    // ── Find vendor (include password field explicitly) ───────────────────────
-    const vendor = await Vendor.findOne({ email }).select("+password");
-    if (!vendor) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid email or password",
-      });
+    const vendor = await Vendor.findOne({
+      email: email.toLowerCase().trim(),
+    }).select("+password");
+
+    if (!vendor || !vendor.password) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Invalid email or password" });
     }
 
-    // ── Compare password ──────────────────────────────────────────────────────
     const isMatch = await bcrypt.compare(password, vendor.password);
     if (!isMatch) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid email or password",
-      });
+      return res
+        .status(401)
+        .json({ success: false, message: "Invalid email or password" });
     }
 
-    // ── (Optional) block REJECTED vendors from logging in ────────────────────
     if (vendor.status === "REJECTED") {
       return res.status(403).json({
         success: false,
@@ -145,254 +358,272 @@ exports.loginVendor = async (req, res) => {
       token,
       vendor: {
         _id: vendor._id,
-        firstName: vendor.firstName,
-        lastName: vendor.lastName,
         storeName: vendor.storeName,
         email: vendor.email,
         status: vendor.status,
       },
     });
-  } catch (error) {
-    console.error("Login Vendor Error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server error while logging in",
-    });
+  } catch (err) {
+    console.error("loginVendor Error:", err);
+    res
+      .status(500)
+      .json({ success: false, message: "Server error while logging in" });
   }
 };
 
-/**
- * =====================================================
- * CREATE VENDOR  (admin / manual creation)
- * =====================================================
- * @route   POST /api/vendor
- * @access  Admin
- */
+// ═════════════════════════════════════════════════════════════════════════════
+// GET MY PROFILE (vendor self)
+// GET /api/vendor/profile/me
+// ═════════════════════════════════════════════════════════════════════════════
+exports.getMyVendorProfile = async (req, res) => {
+  try {
+    const vendor = await Vendor.findById(req.vendor._id);
+    if (!vendor) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Vendor not found" });
+    }
+    res.json({ success: true, vendor });
+  } catch (err) {
+    console.error("getMyVendorProfile Error:", err);
+    res
+      .status(500)
+      .json({ success: false, message: "Server error while fetching profile" });
+  }
+};
+
+// ═════════════════════════════════════════════════════════════════════════════
+// CREATE VENDOR (admin manually adds a vendor record)
+// POST /api/vendor/
+// ═════════════════════════════════════════════════════════════════════════════
 exports.createVendor = async (req, res) => {
   try {
-    const {
-      firstName,
-      lastName,
-      email,
-      phone,
-      businessName,
-      businessType,
-      streetAddress,
-      city,
-      state,
-      pinCode,
-      nominateForAwards,
-      acceptMessages,
-      latitude,
-      longitude,
-    } = req.body;
+    const { storeName, email, password, ...rest } = req.body;
 
-    const existingVendor = await Vendor.findOne({ email });
-    if (existingVendor) {
+    if (!email) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Email is required" });
+    }
+
+    const emailExists = await Vendor.findOne({
+      email: email.toLowerCase().trim(),
+    });
+    if (emailExists) {
       return res.status(400).json({
         success: false,
-        message: "Vendor already exists with this email",
+        message: "A vendor with this email already exists",
       });
     }
 
+    if (storeName) {
+      const storeExists = await Vendor.findOne({
+        storeName: storeName.toLowerCase().trim(),
+      });
+      if (storeExists) {
+        return res.status(400).json({
+          success: false,
+          message: "This store name is already taken",
+        });
+      }
+    }
+
+    let hashedPassword;
+    if (password) {
+      const salt = await bcrypt.genSalt(10);
+      hashedPassword = await bcrypt.hash(password, salt);
+    }
+
     const vendor = await Vendor.create({
-      firstName,
-      lastName,
-      email,
-      phone,
-      businessName,
-      businessType,
-      streetAddress,
-      city,
-      state,
-      pinCode,
-      nominateForAwards,
-      acceptMessages,
-      latitude,
-      longitude,
+      ...(storeName && { storeName: storeName.toLowerCase().trim() }),
+      email: email.toLowerCase().trim(),
+      ...(hashedPassword && { password: hashedPassword }),
+      isEmailVerified: false,
+      ...rest,
     });
 
     res.status(201).json({
       success: true,
       message: "Vendor created successfully",
-      vendor,
+      vendor: {
+        _id: vendor._id,
+        storeName: vendor.storeName,
+        email: vendor.email,
+        status: vendor.status,
+      },
     });
-  } catch (error) {
-    console.error("Create Vendor Error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server error while creating vendor",
-    });
+  } catch (err) {
+    console.error("createVendor Error:", err);
+    res
+      .status(500)
+      .json({ success: false, message: "Server error while creating vendor" });
   }
 };
 
-/**
- * =====================================================
- * GET SINGLE VENDOR DETAILS
- * =====================================================
- * @route   GET /api/vendor/:vendorId
- * @access  Private (Vendor/Admin)
- */
-exports.getVendorDetails = async (req, res) => {
+// ═════════════════════════════════════════════════════════════════════════════
+// GET ALL VENDORS (admin)
+// GET /api/vendor/
+// ═════════════════════════════════════════════════════════════════════════════
+exports.getAllVendors = async (req, res) => {
   try {
-    const { vendorId } = req.params;
+    const { status, page = 1, limit = 20 } = req.query;
+    const filter = {};
+    if (status) filter.status = status.toUpperCase();
 
-    const vendor = await Vendor.findById(vendorId);
-    if (!vendor) {
-      return res.status(404).json({
-        success: false,
-        message: "Vendor not found",
-      });
-    }
-
-    res.json({ success: true, vendor });
-  } catch (error) {
-    console.error("Get Vendor Error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server error while fetching vendor",
-    });
-  }
-};
-
-/**
- * =====================================================
- * GET LOGGED-IN VENDOR PROFILE
- * =====================================================
- * @route   GET /api/vendor/profile/me
- * @access  Private (Vendor)
- */
-exports.getMyVendorProfile = async (req, res) => {
-  try {
-    const vendor = await Vendor.findById(req.vendor.id);
-    if (!vendor) {
-      return res.status(404).json({
-        success: false,
-        message: "Vendor not found",
-      });
-    }
-
-    res.json({ success: true, vendor });
-  } catch (error) {
-    console.error("Get My Vendor Profile Error:", error);
-    res.status(500).json({ success: false, message: "Server error" });
-  }
-};
-
-/**
- * =====================================================
- * UPDATE VENDOR DETAILS
- * =====================================================
- * @route   PUT /api/vendor/:vendorId
- * @access  Private (Vendor/Admin)
- */
-exports.updateVendor = async (req, res) => {
-  try {
-    const { vendorId } = req.params;
-
-    const vendor = await Vendor.findByIdAndUpdate(vendorId, req.body, {
-      new: true,
-      runValidators: true,
-    });
-
-    if (!vendor) {
-      return res.status(404).json({
-        success: false,
-        message: "Vendor not found",
-      });
-    }
+    const skip = (Number(page) - 1) * Number(limit);
+    const total = await Vendor.countDocuments(filter);
+    const vendors = await Vendor.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit));
 
     res.json({
       success: true,
-      message: "Vendor updated successfully",
-      vendor,
+      total,
+      page: Number(page),
+      pages: Math.ceil(total / Number(limit)),
+      vendors,
     });
-  } catch (error) {
-    console.error("Update Vendor Error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server error while updating vendor",
-    });
+  } catch (err) {
+    console.error("getAllVendors Error:", err);
+    res
+      .status(500)
+      .json({ success: false, message: "Server error while fetching vendors" });
   }
 };
 
-/**
- * =====================================================
- * GET ALL VENDORS
- * =====================================================
- * @route   GET /api/vendor
- * @access  Admin
- */
-exports.getAllVendors = async (req, res) => {
+// ═════════════════════════════════════════════════════════════════════════════
+// GET VENDOR BY ID (admin)
+// GET /api/vendor/:vendorId
+// ═════════════════════════════════════════════════════════════════════════════
+exports.getVendorDetails = async (req, res) => {
   try {
-    const vendors = await Vendor.find().sort({ createdAt: -1 });
-
-    res.json({ success: true, count: vendors.length, vendors });
-  } catch (error) {
-    console.error("Get All Vendors Error:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+    const vendor = await Vendor.findById(req.params.vendorId);
+    if (!vendor) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Vendor not found" });
+    }
+    res.json({ success: true, vendor });
+  } catch (err) {
+    console.error("getVendorDetails Error:", err);
+    res
+      .status(500)
+      .json({ success: false, message: "Server error while fetching vendor" });
   }
 };
 
-/**
- * =====================================================
- * UPDATE VENDOR STATUS (ACCEPT / REJECT)
- * =====================================================
- * @route   PATCH /api/vendor/:vendorId/status
- * @access  Admin
- */
-exports.updateVendorStatus = async (req, res) => {
+// ═════════════════════════════════════════════════════════════════════════════
+// UPDATE VENDOR
+// PUT /api/vendor/profile/me  (vendor self  — uses req.vendor._id)
+// PUT /api/vendor/:vendorId   (admin        — uses req.params.vendorId)
+// ═════════════════════════════════════════════════════════════════════════════
+exports.updateVendor = async (req, res) => {
   try {
-    const { vendorId } = req.params;
-    const { status } = req.body;
+    const targetId = req.params.vendorId || req.vendor._id;
 
-    if (!["ACCEPTED", "REJECTED"].includes(status)) {
-      return res.status(400).json({ message: "Invalid status" });
+    // Strip sensitive / system fields
+    const { password, otp, otpExpires, status, ...updates } = req.body;
+
+    if (updates.storeName) {
+      updates.storeName = updates.storeName.toLowerCase().trim();
+      const conflict = await Vendor.findOne({
+        storeName: updates.storeName,
+        _id: { $ne: targetId },
+      });
+      if (conflict) {
+        return res.status(400).json({
+          success: false,
+          message: "This store name is already taken",
+        });
+      }
     }
 
     const vendor = await Vendor.findByIdAndUpdate(
-      vendorId,
-      { status },
+      targetId,
+      { $set: updates },
+      { new: true, runValidators: true },
+    );
+
+    if (!vendor) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Vendor not found" });
+    }
+
+    res.json({ success: true, message: "Vendor updated successfully", vendor });
+  } catch (err) {
+    console.error("updateVendor Error:", err);
+    res
+      .status(500)
+      .json({ success: false, message: "Server error while updating vendor" });
+  }
+};
+
+// ═════════════════════════════════════════════════════════════════════════════
+// DELETE VENDOR (admin)
+// DELETE /api/vendor/:vendorId
+// ═════════════════════════════════════════════════════════════════════════════
+exports.deleteVendor = async (req, res) => {
+  try {
+    const vendor = await Vendor.findByIdAndDelete(req.params.vendorId);
+    if (!vendor) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Vendor not found" });
+    }
+    res.json({ success: true, message: "Vendor deleted successfully" });
+  } catch (err) {
+    console.error("deleteVendor Error:", err);
+    res
+      .status(500)
+      .json({ success: false, message: "Server error while deleting vendor" });
+  }
+};
+
+// ═════════════════════════════════════════════════════════════════════════════
+// UPDATE VENDOR STATUS (admin)
+// PATCH /api/vendor/:vendorId/status
+// body: { status: "ACCEPTED" | "REJECTED" | "PENDING" }
+// ═════════════════════════════════════════════════════════════════════════════
+exports.updateVendorStatus = async (req, res) => {
+  try {
+    const VALID = ["PENDING", "ACCEPTED", "REJECTED"];
+    const { status } = req.body;
+
+    if (!status || !VALID.includes(status.toUpperCase())) {
+      return res.status(400).json({
+        success: false,
+        message: `Status must be one of: ${VALID.join(", ")}`,
+      });
+    }
+
+    const vendor = await Vendor.findByIdAndUpdate(
+      req.params.vendorId,
+      { status: status.toUpperCase() },
       { new: true },
     );
 
     if (!vendor) {
-      return res.status(404).json({ message: "Vendor not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Vendor not found" });
     }
 
     res.json({
       success: true,
-      message: `Vendor ${status.toLowerCase()} successfully`,
-      vendor,
+      message: `Vendor status updated to ${vendor.status}`,
+      vendor: {
+        _id: vendor._id,
+        storeName: vendor.storeName,
+        email: vendor.email,
+        status: vendor.status,
+      },
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-/**
- * =====================================================
- * DELETE VENDOR
- * =====================================================
- * @route   DELETE /api/vendor/:vendorId
- * @access  Admin
- */
-exports.deleteVendor = async (req, res) => {
-  try {
-    const { vendorId } = req.params;
-
-    const vendor = await Vendor.findByIdAndDelete(vendorId);
-    if (!vendor) {
-      return res.status(404).json({
-        success: false,
-        message: "Vendor not found",
-      });
-    }
-
-    res.json({ success: true, message: "Vendor deleted successfully" });
-  } catch (error) {
-    console.error("Delete Vendor Error:", error);
-    res.status(500).json({ success: false, message: "Server error" });
+    console.error("updateVendorStatus Error:", err);
+    res
+      .status(500)
+      .json({ success: false, message: "Server error while updating status" });
   }
 };

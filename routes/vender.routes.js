@@ -1,16 +1,24 @@
 const express = require("express");
 const router = express.Router();
 
+// ── Single unified controller ─────────────────────────────────────────────────
 const {
-  registerVendor,
+  // Email-first login/register flow
+  checkEmail,
+  sendOtp,
+  verifyOtp,
+  setPassword,
+  // Auth
   loginVendor,
-  createVendor,
-  getVendorDetails,
+  // Vendor self
   getMyVendorProfile,
   updateVendor,
+  // Admin CRUD
+  createVendor,
   getAllVendors,
-  updateVendorStatus,
+  getVendorDetails,
   deleteVendor,
+  updateVendorStatus,
 } = require("../controllers/vender.controller");
 
 const {
@@ -20,42 +28,38 @@ const {
   acceptedVendorOnly,
 } = require("../middleware/auth.middleware");
 
-/* ================= AUTH ================= */
+/* ================= AUTH — EMAIL-FIRST FLOW ================= */
 
-// Register a new vendor
-router.post("/register", registerVendor);
+// Step 1 – check if this email exists in DB
+router.post("/check-email", checkEmail);
 
-// Login vendor → returns JWT
+// Step 2 – send OTP to that email
+router.post("/send-otp", sendOtp);
+
+// Step 3 – verify OTP
+//   → needsPassword: true  + setupToken  (first-time vendor, create password next)
+//   → needsPassword: false + token       (returning vendor, go to dashboard)
+router.post("/verify-otp", verifyOtp);
+
+// Step 4 – first-time only: create password (Bearer setupToken required)
+//   → token + vendor → redirect to dashboard
+router.post("/set-password", setPassword);
+
+// Standard login (email + password, for returning vendors)
 router.post("/login", loginVendor);
 
 /* ================= VENDOR PROFILE (self) ================= */
 
-// Get logged-in vendor's own profile
 router.get("/profile/me", protectVendor, getMyVendorProfile);
-
-// Update logged-in vendor's own profile
 router.put("/profile/me", protectVendor, acceptedVendorOnly, updateVendor);
 
 /* ================= VENDOR MANAGEMENT (admin) ================= */
 
-// Create vendor manually (admin)
 router.post("/", protect, admin, createVendor);
-
-// Get all vendors (admin)
 router.get("/", protect, admin, getAllVendors);
-
-// Get vendor by ID (admin)
 router.get("/:vendorId", protect, admin, getVendorDetails);
-
-// Update vendor by ID (admin)
 router.put("/:vendorId", protect, admin, updateVendor);
-
-// Delete vendor (admin)
 router.delete("/:vendorId", protect, admin, deleteVendor);
-
-/* ================= VENDOR STATUS (admin) ================= */
-
-// Accept / Reject vendor
 router.patch("/:vendorId/status", protect, admin, updateVendorStatus);
 
 module.exports = router;
