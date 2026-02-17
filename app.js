@@ -22,7 +22,7 @@ const Products = require("./routes/product.routes");
 const SubCategory = require("./routes/subCategory.routes");
 const Cart = require("./routes/cart.routes");
 const Vendor = require("./routes/vender.routes");
-
+const Order = require("./routes/order.routes");
 /* =======================
    Middleware
 ======================= */
@@ -49,6 +49,7 @@ app.use("/api/subcategory", SubCategory);
 app.use("/api/product", Products);
 app.use("/api/vendor", Vendor);
 app.use("/api/cart", Cart);
+app.use("/api/order", Order);
 
 /* =======================
    🔥 ADD THIS: Route Listing API (DEV ONLY)
@@ -83,7 +84,7 @@ app.listen(PORT, () => {
 
     routes.forEach((route, index) => {
       console.log(
-        `${index + 1}. ${route.methods.join(", ").padEnd(8)} ${route.path}`
+        `${index + 1}. ${route.methods.join(", ").padEnd(8)} ${route.path}`,
       );
     });
 

@@ -32,7 +32,7 @@ const productSchema = new mongoose.Schema(
     rating: { type: Number, default: null },
     more_details: { type: Object, default: {} },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 const ProductModel = mongoose.model("Product", productSchema);

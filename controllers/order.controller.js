@@ -1,89 +1,137 @@
-// const Order = require("../models/Order");
-// const Product = require("../models/Product");
-// const Vendor = require("../models/Vendor");
-// const io = require("../socket").getIO();
+const Order = require("../models/Order.model");
+const Product = require("../models/Product.model");
+const Vendor = require("../models/Vendor.model");
+const mongoose = require("mongoose");
 
-// exports.createOrder = async (req, res) => {
-//   try {
-//     const userId = req.user.id;
-//     const { items, shippingAddress, selectedStore, paymentMethod } = req.body;
+// 🔹 CREATE ORDER
+exports.createOrder = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { vendorId, items, shippingAddress } = req.body;
 
-//     const productIds = items.map((i) => i.product);
-//     const productDocs = await Product.find({ _id: { $in: productIds } });
+    if (!vendorId)
+      return res.status(400).json({ message: "Vendor is required" });
 
-//     let subtotal = 0;
-//     const orderItems = items.map((i) => {
-//       const p = productDocs.find((x) => x._id.equals(i.product));
-//       subtotal += p.price * i.quantity;
+    const vendorExists = await Vendor.findById(vendorId);
+    if (!vendorExists)
+      return res.status(400).json({ message: "Vendor not found" });
 
-//       return {
-//         product: p._id,
-//         quantity: i.quantity,
-//         price: p.price,
-//         name: p.name,
-//         vendorId: p.vendorId,
-//       };
-//     });
+    if (!items || items.length === 0)
+      return res.status(400).json({ message: "No items provided" });
 
-//     const tax = subtotal * 0.05;
-//     const deliveryFee = 20;
-//     const totalAmount = subtotal + tax + deliveryFee;
+    const products = await Product.find({
+      _id: { $in: items.map((i) => i.product) },
+    });
 
-//     const vendor = await Vendor.findById(selectedStore.storeId);
+    if (products.length === 0)
+      return res.status(400).json({ message: "Products not found" });
 
-//     const storeSnapshot = {
-//       storeId: vendor._id,
-//       name: vendor.businessName,
-//       phone: vendor.phone,
-//       streetAddress: vendor.streetAddress,
-//       city: vendor.city,
-//       state: vendor.state,
-//       pinCode: vendor.pinCode,
-//       latitude: vendor.latitude,
-//       longitude: vendor.longitude,
-//       autoSelected: selectedStore.autoSelected,
-//     };
+    let totalAmount = 0;
+    const orderItems = items.map((item) => {
+      const product = products.find((p) => p._id.toString() === item.product);
+      if (!product) throw new Error("Invalid product in order");
+      totalAmount += product.price * item.quantity;
+      return {
+        product: product._id,
+        name: product.name,
+        price: product.price,
+        quantity: item.quantity,
+      };
+    });
 
-//     const order = await Order.create({
-//       user: userId,
-//       items: orderItems,
-//       subtotal,
-//       tax,
-//       deliveryFee,
-//       totalAmount,
-//       shippingAddress,
-//       selectedStore: storeSnapshot,
-//       paymentMethod,
-//       status: "PLACED",
-//       events: [{ status: "PLACED", actor: "USER" }],
-//     });
+    const order = await Order.create({
+      user: userId,
+      vendor: vendorId,
+      items: orderItems,
+      totalAmount,
+      shippingAddress,
+      status: "PLACED",
+    });
 
-//     io.emit("admin_new_order", order);
-//     io.emit(`vendor_${vendor._id}`, { type: "NEW_ORDER", order });
+    res.status(201).json({ success: true, order });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Error creating order" });
+  }
+};
 
-//     res.json({ success: true, orderId: order._id, order });
-//   } catch (err) {
-//     console.log(err);
-//     res.status(500).json({ message: "Error creating order" });
-//   }
-// };
+// 🔹 GET USER ORDERS
+exports.getMyOrders = async (req, res) => {
+  try {
+    const orders = await Order.find({ user: req.user._id })
+      .populate("vendor", "businessName phone")
+      .sort({ createdAt: -1 });
+    res.json({ success: true, orders });
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching orders" });
+  }
+};
 
-// exports.getOrder = async (req, res) => {
-//   const order = await Order.findById(req.params.id)
-//     .populate("items.product")
-//     .populate("deliveryAgent.partnerId");
+// ✅ FIXED: GET VENDOR ORDERS — populates user + full product (including images array)
+exports.getVendorOrders = async (req, res) => {
+  try {
+    console.log("Logged in vendor ID:", req.vendor._id);
 
-//   res.json({ success: true, order });
-// };
+    const orders = await Order.find({ vendor: req.vendor._id })
+      // ✅ populate all user fields needed for display
+      .populate("user", "firstName lastName email phone")
+      // ✅ populate full product including images array
+      .populate(
+        "items.product",
+        "name description price originalPrice discount discountedMRP sku category subCategory images photos gallery imageUrl image photo thumbnail unit pack stock productName rating",
+      )
+      .sort({ createdAt: -1 });
 
-// exports.getMyOrders = async (req, res) => {
-//   const orders = await Order.find({ user: req.user.id }).sort({
-//     createdAt: -1,
-//   });
-//   res.json({ success: true, orders });
-// };
+    console.log("Orders found:", orders.length);
+    res.json({ success: true, orders });
+  } catch (error) {
+    console.error("Error fetching vendor orders:", error);
+    res.status(500).json({ message: "Error fetching vendor orders" });
+  }
+};
 
-// exports.getAllOrders = async (req, res) => {
-//   const orders = await Order.find().sort({ createdAt: -1 });
-//   res.json({ success: true, orders });
-// };
+// 🔹 GET SINGLE ORDER
+exports.getOrder = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id)
+      .populate("user", "firstName lastName email")
+      .populate("vendor", "businessName phone")
+      .populate("items.product");
+    if (!order) return res.status(404).json({ message: "Order not found" });
+    res.json({ success: true, order });
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching order" });
+  }
+};
+
+// 🔹 ADMIN GET ALL ORDERS
+exports.getAllOrders = async (req, res) => {
+  try {
+    const orders = await Order.find()
+      .populate("user", "email")
+      .populate("vendor", "businessName")
+      .sort({ createdAt: -1 });
+    res.json({ success: true, count: orders.length, orders });
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching all orders" });
+  }
+};
+
+// 🔹 VENDOR UPDATE ORDER STATUS
+exports.updateOrderStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+    const allowedStatuses = ["ACCEPTED", "REJECTED", "COMPLETED"];
+    if (!allowedStatuses.includes(status))
+      return res.status(400).json({ message: "Invalid status" });
+
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ message: "Order not found" });
+
+    order.status = status;
+    await order.save();
+    res.json({ success: true, order });
+  } catch (error) {
+    res.status(500).json({ message: "Error updating status" });
+  }
+};
