@@ -466,7 +466,7 @@ exports.createVendor = async (req, res) => {
 // ═════════════════════════════════════════════════════════════════════════════
 exports.getAllVendors = async (req, res) => {
   try {
-    const { status, page = 1, limit = 20 } = req.query;
+    const { status, page = 1, limit = 100 } = req.query;
     const filter = {};
     if (status) filter.status = status.toUpperCase();
 
