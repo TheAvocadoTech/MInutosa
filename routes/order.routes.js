@@ -17,6 +17,6 @@ router.get("/vendor/orders", protectVendor, orderCtrl.getVendorOrders);
 router.put("/vendor/:id/status", protectVendor, orderCtrl.updateOrderStatus);
 
 // ADMIN
-router.get("/admin/all", protect, admin, orderCtrl.getAllOrders);
+router.get("/admin/all", orderCtrl.getAllOrders);
 
 module.exports = router;
