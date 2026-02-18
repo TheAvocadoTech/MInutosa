@@ -113,7 +113,7 @@ exports.getAllOrders = async (req, res) => {
       .sort({ createdAt: -1 });
     res.json({ success: true, count: orders.length, orders });
   } catch (error) {
-    res.status(500).json({ message: "Error fetching all orders" });
+    res.status(500).json({ message: "Error fetching al orders" });
   }
 };
 
