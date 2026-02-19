@@ -110,10 +110,16 @@ exports.getAllOrders = async (req, res) => {
     const orders = await Order.find()
       .populate("user", "email")
       .populate("vendor", "businessName")
+      .populate({
+        path: "items.product", // Change 'productId' to 'product'
+        select: "productName images price description", // Make sure 'images' matches your Product model field
+      })
       .sort({ createdAt: -1 });
+
     res.json({ success: true, count: orders.length, orders });
   } catch (error) {
-    res.status(500).json({ message: "Error fetching al orders" });
+    console.error("Order Fetch Error:", error);
+    res.status(500).json({ message: "Error fetching orders" });
   }
 };
 
