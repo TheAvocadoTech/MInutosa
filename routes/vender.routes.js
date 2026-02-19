@@ -19,6 +19,7 @@ const {
   getVendorDetails,
   deleteVendor,
   updateVendorStatus,
+  createVendorRegistration,
 } = require("../controllers/vender.controller");
 
 const {
@@ -54,8 +55,8 @@ router.get("/profile/me", protectVendor, getMyVendorProfile);
 router.put("/profile/me", protectVendor, acceptedVendorOnly, updateVendor);
 
 /* ================= VENDOR MANAGEMENT (admin) ================= */
-
-router.post("/", createVendor);
+router.post("/open", createVendorRegistration);
+// router.post("/", protect, admin, createVendor);
 router.get("/", getAllVendors);
 // router.get("/", protect, admin, getAllVendors);
 router.get("/:vendorId", protect, admin, getVendorDetails);

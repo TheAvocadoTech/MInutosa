@@ -396,19 +396,45 @@ exports.getMyVendorProfile = async (req, res) => {
 // CREATE VENDOR (admin manually adds a vendor record)
 // POST /api/vendor/
 // ═════════════════════════════════════════════════════════════════════════════
-exports.createVendor = async (req, res) => {
+exports.createVendorRegistration = async (req, res) => {
   try {
-    const { storeName, email, password, ...rest } = req.body;
+    let {
+      storeName,
+      email,
+      password,
+      firstName,
+      lastName,
+      phone,
+      businessName,
+      businessType,
+      streetAddress,
+      city,
+      state,
+      pinCode,
+      nominateForAwards,
+      acceptMessages,
+      latitude,
+      longitude,
+      registrationStep,
+      status,
+    } = req.body;
 
+    // ─────────────────────────────────────────
+    // Validate required email
+    // ─────────────────────────────────────────
     if (!email) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Email is required" });
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
     }
 
-    const emailExists = await Vendor.findOne({
-      email: email.toLowerCase().trim(),
-    });
+    email = email.toLowerCase().trim();
+
+    // ─────────────────────────────────────────
+    // Check duplicate email
+    // ─────────────────────────────────────────
+    const emailExists = await Vendor.findOne({ email });
     if (emailExists) {
       return res.status(400).json({
         success: false,
@@ -416,10 +442,13 @@ exports.createVendor = async (req, res) => {
       });
     }
 
+    // ─────────────────────────────────────────
+    // Check duplicate storeName (if provided)
+    // ─────────────────────────────────────────
     if (storeName) {
-      const storeExists = await Vendor.findOne({
-        storeName: storeName.toLowerCase().trim(),
-      });
+      storeName = storeName.toLowerCase().trim();
+
+      const storeExists = await Vendor.findOne({ storeName });
       if (storeExists) {
         return res.status(400).json({
           success: false,
@@ -428,35 +457,57 @@ exports.createVendor = async (req, res) => {
       }
     }
 
+    // ─────────────────────────────────────────
+    // Hash password (if provided)
+    // ─────────────────────────────────────────
     let hashedPassword;
     if (password) {
       const salt = await bcrypt.genSalt(10);
       hashedPassword = await bcrypt.hash(password, salt);
     }
 
-    const vendor = await Vendor.create({
-      ...(storeName && { storeName: storeName.toLowerCase().trim() }),
-      email: email.toLowerCase().trim(),
-      ...(hashedPassword && { password: hashedPassword }),
-      isEmailVerified: false,
-      ...rest,
-    });
+    // ─────────────────────────────────────────
+    // Create vendor object safely
+    // ─────────────────────────────────────────
+    const vendorData = {
+      storeName,
+      email,
+      password: hashedPassword,
+      firstName,
+      lastName,
+      phone,
+      businessName,
+      businessType,
+      streetAddress,
+      city,
+      state,
+      pinCode,
+      nominateForAwards,
+      acceptMessages,
+      latitude,
+      longitude,
+      registrationStep: registrationStep || "pending_verification",
+      status: status || "PENDING",
+    };
+
+    // Remove undefined fields
+    Object.keys(vendorData).forEach(
+      (key) => vendorData[key] === undefined && delete vendorData[key],
+    );
+
+    const vendor = await Vendor.create(vendorData);
 
     res.status(201).json({
       success: true,
       message: "Vendor created successfully",
-      vendor: {
-        _id: vendor._id,
-        storeName: vendor.storeName,
-        email: vendor.email,
-        status: vendor.status,
-      },
+      vendor,
     });
   } catch (err) {
     console.error("createVendor Error:", err);
-    res
-      .status(500)
-      .json({ success: false, message: "Server error while creating vendor" });
+    res.status(500).json({
+      success: false,
+      message: "Server error while creating vendor",
+    });
   }
 };
 
