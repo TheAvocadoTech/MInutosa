@@ -28,9 +28,10 @@
 const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-
+const SMSService = require("../services/smsService");
 const Vendor = require("../models/Vendor.model");
-const { sendOtpEmail } = require("../utils/sendEmail.util");
+
+// const { sendOtpEmail } = require("../utils/sendEmail.util");
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 const OTP_EXPIRY_MIN = 10;
@@ -80,47 +81,52 @@ exports.checkEmail = async (req, res) => {
 // POST /api/vendor/send-otp
 // body: { email }
 // ═════════════════════════════════════════════════════════════════════════════
+
+// 1. SEND OTP (With Existence Check)
 exports.sendOtp = async (req, res) => {
   try {
-    const { email } = req.body;
-    if (!email) {
+    const { phone } = req.body;
+    if (!phone)
       return res
         .status(400)
-        .json({ success: false, message: "Email is required" });
-    }
+        .json({ success: false, message: "Phone is required" });
 
-    const normalizedEmail = email.toLowerCase().trim();
-    const vendor = await Vendor.findOne({ email: normalizedEmail });
+    // Format the number to match DB storage (10 digits)
+    const normalizedPhone = SMSService.formatPhoneNumber(phone);
+
+    // 🔍 THE CHECK: Does this vendor exist?
+    const vendor = await Vendor.findOne({ phone: normalizedPhone });
 
     if (!vendor) {
       return res.status(404).json({
         success: false,
-        message: "No vendor account found with this email.",
+        message:
+          "This phone number is not registered as a vendor. Please contact admin.",
       });
     }
 
     const otp = generateOtp();
-    const otpExpires = new Date(Date.now() + OTP_EXPIRY_MIN * 60 * 1000);
+    const otpExpires = new Date(Date.now() + 3 * 60 * 1000);
+
+    // Send via your SMS provider
+    const smsResult = await SMSService.sendOTP(normalizedPhone, otp);
+    if (!smsResult.success) {
+      return res
+        .status(500)
+        .json({ success: false, message: "Failed to deliver SMS" });
+    }
 
     vendor.otp = otp;
     vendor.otpExpires = otpExpires;
-    vendor.isEmailVerified = false;
+    vendor.isPhoneVerified = false;
     await vendor.save();
 
-    await sendOtpEmail(normalizedEmail, otp, OTP_EXPIRY_MIN);
-
-    res.json({
-      success: true,
-      message: `A ${OTP_LENGTH}-digit verification code was sent to ${normalizedEmail}`,
-    });
+    res.json({ success: true, message: "OTP sent successfully" });
   } catch (err) {
-    console.error("sendOtp Error:", err);
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to send verification code" });
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };
-
 // ═════════════════════════════════════════════════════════════════════════════
 // 3. VERIFY OTP
 // POST /api/vendor/verify-otp
@@ -134,57 +140,45 @@ exports.sendOtp = async (req, res) => {
 // ═════════════════════════════════════════════════════════════════════════════
 exports.verifyOtp = async (req, res) => {
   try {
-    const { email, otp } = req.body;
-    if (!email || !otp) {
+    const { phone, otp } = req.body;
+    if (!phone || !otp) {
       return res
         .status(400)
-        .json({ success: false, message: "Email and OTP are required" });
+        .json({ success: false, message: "Phone and OTP are required" });
     }
 
-    const vendor = await Vendor.findOne({
-      email: email.toLowerCase().trim(),
-    }).select("+otp +otpExpires +password");
+    const normalizedPhone = SMSService.formatPhoneNumber(phone);
+    const vendor = await Vendor.findOne({ phone: normalizedPhone }).select(
+      "+otp +otpExpires +password",
+    );
 
     if (!vendor) {
-      return res.status(400).json({
-        success: false,
-        message: "No pending verification for this email",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "No pending verification found" });
     }
+
     if (!vendor.otp || !vendor.otpExpires) {
       return res
         .status(400)
         .json({ success: false, message: "Please request a new OTP" });
     }
     if (new Date() > vendor.otpExpires) {
-      return res.status(400).json({
-        success: false,
-        message: "OTP has expired. Please request a new one.",
-      });
-    }
-    if (vendor.otp !== otp.trim()) {
       return res
         .status(400)
-        .json({ success: false, message: "Invalid OTP. Please try again." });
+        .json({ success: false, message: "OTP has expired" });
+    }
+    if (vendor.otp !== otp.trim()) {
+      return res.status(400).json({ success: false, message: "Invalid OTP" });
     }
 
-    // Clear OTP fields
-    vendor.isEmailVerified = true;
+    // Clear OTP
+    vendor.isPhoneVerified = true;
     vendor.otp = undefined;
     vendor.otpExpires = undefined;
     await vendor.save();
 
-    // ── First-time: no password yet ───────────────────────────────────────────
-    if (!vendor.password) {
-      const setupToken = generateToken(vendor._id, "15m");
-      return res.json({
-        success: true,
-        needsPassword: true,
-        setupToken,
-      });
-    }
-
-    // ── Returning vendor: log in directly ─────────────────────────────────────
+    // Check rejected status
     if (vendor.status === "REJECTED") {
       return res.status(403).json({
         success: false,
@@ -192,15 +186,15 @@ exports.verifyOtp = async (req, res) => {
       });
     }
 
+    // ✅ Always return token directly — no password setup needed
     const token = generateToken(vendor._id);
     return res.json({
       success: true,
-      needsPassword: false,
       token,
       vendor: {
         _id: vendor._id,
-        storeName: vendor.storeName,
-        email: vendor.email,
+        businessName: vendor.businessName,
+        phone: vendor.phone,
         status: vendor.status,
       },
     });
@@ -209,7 +203,6 @@ exports.verifyOtp = async (req, res) => {
     res.status(500).json({ success: false, message: "Verification failed" });
   }
 };
-
 // ═════════════════════════════════════════════════════════════════════════════
 // 4. SET PASSWORD — first-time only, requires setupToken in header
 // POST /api/vendor/set-password

@@ -1,14 +1,54 @@
-// models/User.js
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
+// ── Saved Address Sub-schema ──────────────────────────────────────────────────
+const savedAddressSchema = new mongoose.Schema(
+  {
+    label: {
+      type: String,
+      enum: ["Home", "Work", "Other"],
+      default: "Home",
+    },
+    street: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    city: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    state: {
+      type: String,
+      trim: true,
+    },
+    pincode: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    phone: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    isDefault: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  { _id: true, timestamps: true },
+);
+
+// ── User Schema ───────────────────────────────────────────────────────────────
 const userSchema = new mongoose.Schema(
   {
     phoneNumber: {
       type: String,
       unique: true,
       trim: true,
-      sparse: true, //
+      sparse: true,
     },
 
     name: {
@@ -21,11 +61,17 @@ const userSchema = new mongoose.Schema(
       unique: true,
       lowercase: true,
       trim: true,
-      sparse: true, // allow multiple docs without email
+      sparse: true,
     },
 
     address: {
       type: String,
+    },
+
+    // ── Saved delivery addresses ──────────────────────────────────
+    savedAddresses: {
+      type: [savedAddressSchema],
+      default: [],
     },
 
     profilePicture: {
@@ -34,7 +80,6 @@ const userSchema = new mongoose.Schema(
 
     password: {
       type: String,
-      // required only for password-based accounts (admins/users). You can enforce on register route.
     },
 
     isAdmin: {
@@ -42,6 +87,7 @@ const userSchema = new mongoose.Schema(
       required: true,
       default: false,
     },
+
     role: {
       type: String,
       enum: ["USER", "DELIVERY_AGENT", "ADMIN"],
@@ -62,7 +108,7 @@ const userSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-// Pre-save: hash password if modified
+// ── Pre-save: hash password if modified ──────────────────────────────────────
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
   try {
@@ -74,13 +120,13 @@ userSchema.pre("save", async function (next) {
   }
 });
 
-// Instance: compare password
+// ── Instance: compare password ────────────────────────────────────────────────
 userSchema.methods.comparePassword = function (plainPassword) {
   if (!this.password) return false;
   return bcrypt.compare(plainPassword, this.password);
 };
 
-// Generate OTP
+// ── Generate OTP ──────────────────────────────────────────────────────────────
 userSchema.methods.generateOTP = function () {
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
   this.otp = {
@@ -91,7 +137,7 @@ userSchema.methods.generateOTP = function () {
   return otp;
 };
 
-// Verify OTP
+// ── Verify OTP ────────────────────────────────────────────────────────────────
 userSchema.methods.verifyOTP = function (inputOTP) {
   if (!this.otp || !this.otp.code || new Date() > this.otp.expiresAt) {
     return false;
@@ -105,7 +151,7 @@ userSchema.methods.verifyOTP = function (inputOTP) {
   if (!isValid) {
     this.otp.attempts += 1;
   } else {
-    this.otp = undefined; // ✅ clear OTP on success
+    this.otp = undefined;
   }
 
   return isValid;

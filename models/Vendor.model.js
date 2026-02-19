@@ -35,11 +35,6 @@ const vendorSchema = new mongoose.Schema(
       select: false,
     },
 
-    isEmailVerified: {
-      type: Boolean,
-      default: false,
-    },
-
     // ── Registration state machine ────────────────────────────────────────────
     // "pending_verification" → "pending_password" → "pending_approval" → active
     registrationStep: {
@@ -51,7 +46,12 @@ const vendorSchema = new mongoose.Schema(
     // ── Filled in later (profile completion / admin) ──────────────────────────
     firstName: { type: String, trim: true },
     lastName: { type: String, trim: true },
-    phone: { type: String, trim: true },
+    phone: {
+      type: String,
+      required: [true, "Phone number is required"],
+      unique: true,
+      trim: true,
+    },
     businessName: { type: String, trim: true },
     businessType: { type: String, trim: true },
     streetAddress: { type: String, trim: true },

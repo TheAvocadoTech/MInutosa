@@ -9,9 +9,29 @@ const {
 } = require("../controllers/AuthController");
 
 const { protect, admin } = require("../middleware/auth.middleware");
+const {
+  getSavedAddresses,
+  saveAddress,
+  updateAddress,
+  deleteAddress,
+  setDefaultAddress,
+} = require("../controllers/Address.Controller");
 
 const router = express.Router();
 
+router.get("/addresses", protect, getSavedAddresses);
+
+// POST   /api/user/addresses            → save a new address
+router.post("/addresses", protect, saveAddress);
+
+// PUT    /api/user/addresses/:addressId → update an existing address
+router.put("/addresses/:addressId", protect, updateAddress);
+
+// DELETE /api/user/addresses/:addressId → delete an address
+router.delete("/addresses/:addressId", protect, deleteAddress);
+
+// PATCH  /api/user/addresses/:addressId/default → set as default
+router.patch("/addresses/:addressId/default", protect, setDefaultAddress);
 /* ================= USER (OTP AUTH) ================= */
 
 // Send OTP

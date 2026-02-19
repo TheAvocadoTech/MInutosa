@@ -43,6 +43,7 @@ app.get("/", (req, res) => {
    API Routes
 ======================= */
 app.use("/api/auth", UserRoutes);
+app.use("/api/user", UserRoutes);
 app.use("/api/ads", Banner);
 app.use("/api/category", Category);
 app.use("/api/subcategory", SubCategory);
