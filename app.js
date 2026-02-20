@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const cookieParser = require("cookie-parser");
+const paymentRoutes = require("./routes/payment.routes");
 const listEndpoints = require("express-list-endpoints");
 require("dotenv").config();
 
@@ -51,6 +52,7 @@ app.use("/api/product", Products);
 app.use("/api/vendor", Vendor);
 app.use("/api/cart", Cart);
 app.use("/api/order", Order);
+app.use("/api/payment", paymentRoutes);
 
 /* =======================
    🔥 ADD THIS: Route Listing API (DEV ONLY)
