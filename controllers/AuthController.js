@@ -71,7 +71,7 @@ const verifyOtp = async (req, res) => {
     user.otp = undefined;
     await user.save();
 
-    // ✅ SAME JWT FOR ALL ROLES
+    // ✅ SAME JWT FOR ALL ROLES — signed with "userId"
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
       expiresIn: "8d",
     });
@@ -82,8 +82,11 @@ const verifyOtp = async (req, res) => {
       user: {
         id: user._id,
         phoneNumber: user.phoneNumber,
+        name: user.name,
+        email: user.email,
         role: user.role,
         isAdmin: user.isAdmin,
+        isVerified: user.isVerified,
       },
     });
   } catch (error) {
@@ -97,10 +100,7 @@ const adminLogin = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    const adminUser = await User.findOne({
-      email,
-      role: "ADMIN",
-    });
+    const adminUser = await User.findOne({ email, role: "ADMIN" });
 
     if (!adminUser || !(await adminUser.comparePassword(password))) {
       return res.status(401).json({ message: "Invalid admin credentials" });
@@ -125,6 +125,100 @@ const adminLogin = async (req, res) => {
   }
 };
 
+/* ================= UPDATE PROFILE ================= */
+
+const updateProfile = async (req, res) => {
+  try {
+    // req.user is attached by the protect middleware
+    const userId = req.user._id || req.user.id;
+
+    if (!userId) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Not authenticated." });
+    }
+
+    const { name, email, address, profilePicture } = req.body;
+
+    // Build update object — only include fields that were sent
+    const updates = {};
+    if (name !== undefined) updates.name = name.trim();
+    if (address !== undefined) updates.address = address.trim();
+    if (profilePicture !== undefined)
+      updates.profilePicture = profilePicture.trim();
+
+    // Email needs uniqueness check
+    if (email !== undefined) {
+      const normalizedEmail = email.toLowerCase().trim();
+      if (normalizedEmail) {
+        const existing = await User.findOne({
+          email: normalizedEmail,
+          _id: { $ne: userId },
+        });
+        if (existing) {
+          return res.status(409).json({
+            success: false,
+            message: "This email is already in use by another account.",
+          });
+        }
+      }
+      updates.email = normalizedEmail || undefined;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No valid fields provided for update.",
+      });
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { $set: updates },
+      { new: true, runValidators: true },
+    ).select("-otp -password -__v");
+
+    if (!updatedUser) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found." });
+    }
+
+    // Issue a fresh token so frontend localStorage stays in sync
+    const token = jwt.sign(
+      { userId: updatedUser._id },
+      process.env.JWT_SECRET,
+      { expiresIn: "8d" },
+    );
+
+    res.json({
+      success: true,
+      message: "Profile updated successfully.",
+      token,
+      user: {
+        id: updatedUser._id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        phoneNumber: updatedUser.phoneNumber,
+        address: updatedUser.address,
+        profilePicture: updatedUser.profilePicture,
+        role: updatedUser.role,
+        isAdmin: updatedUser.isAdmin,
+        isVerified: updatedUser.isVerified,
+      },
+    });
+  } catch (error) {
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern)[0];
+      return res.status(409).json({
+        success: false,
+        message: `${field} is already taken.`,
+      });
+    }
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 /* ================= OTHER ================= */
 
 const getAllUsers = async (req, res) => {
@@ -140,6 +234,7 @@ module.exports = {
   sendOtp,
   verifyOtp,
   adminLogin,
+  updateProfile,
   getAllUsers,
   logout,
 };

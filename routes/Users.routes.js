@@ -6,6 +6,7 @@ const {
   getAllUsers,
   adminLogin,
   logout,
+  updateProfile,
 } = require("../controllers/AuthController");
 
 const { protect, admin } = require("../middleware/auth.middleware");
@@ -21,6 +22,8 @@ const router = express.Router();
 
 router.get("/addresses", protect, getSavedAddresses);
 
+//use updation
+router.put("/update-profile", protect, updateProfile);
 // POST   /api/user/addresses            → save a new address
 router.post("/addresses", protect, saveAddress);
 
